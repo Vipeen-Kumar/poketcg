@@ -107,6 +107,21 @@ Future phases:
 - local simulator integration,
 - replay ingestion.
 
+### `poketcg.analysis`
+
+Why it exists:
+- Reusable factual query layer over parsed state and typed actions.
+
+Why it is separated:
+- Common board-inspection and legal-action queries should not be duplicated across rule engines, search, RL, evaluation, and replay tooling.
+
+Future phases:
+- rule-engine state queries,
+- search state inspection,
+- RL observation summarization helpers,
+- replay analytics,
+- evaluation statistics.
+
 ### `poketcg.agent`
 
 Why it exists:

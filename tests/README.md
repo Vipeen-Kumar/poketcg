@@ -1,5 +1,12 @@
 # tests
 
-Test package skeleton mirroring `src/poketcg`.
+Test package mirroring `src/poketcg`.
 
-No tests are implemented in this phase. The structure exists now so future work can add unit and integration coverage without reorganizing the repository.
+Implemented coverage currently includes:
+
+- card database tests,
+- observation parser tests,
+- action system tests,
+- game analysis tests.
+
+Future phases can continue expanding unit, integration, regression, and submission smoke coverage within the same mirrored structure.

@@ -99,6 +99,21 @@ class GamePhase(Enum):
     UNKNOWN = auto()
 
 
+class SelectType(Enum):
+    MAIN = auto()
+    CARD = auto()
+    ATTACHED_CARD = auto()
+    CARD_OR_ATTACHED_CARD = auto()
+    ENERGY = auto()
+    SKILL = auto()
+    ATTACK = auto()
+    EVOLVE = auto()
+    COUNT = auto()
+    YES_NO = auto()
+    SPECIAL_CONDITION = auto()
+    UNKNOWN = auto()
+
+
 class SelectContext(Enum):
     MAIN = auto()
     SETUP_ACTIVE_POKEMON = auto()
@@ -170,4 +185,32 @@ class OptionType(Enum):
     END = auto()
     SKILL = auto()
     SPECIAL_CONDITION = auto()
+    UNKNOWN = auto()
+
+
+class LogType(Enum):
+    SHUFFLE = auto()
+    HAS_BASIC_POKEMON = auto()
+    TURN_START = auto()
+    TURN_END = auto()
+    DRAW = auto()
+    DRAW_REVERSE = auto()
+    MOVE_CARD = auto()
+    MOVE_CARD_REVERSE = auto()
+    SWITCH = auto()
+    CHANGE = auto()
+    PLAY = auto()
+    ATTACH = auto()
+    EVOLVE = auto()
+    DEVOLVE = auto()
+    MOVE_ATTACHED = auto()
+    ATTACK = auto()
+    HP_CHANGE = auto()
+    POISONED = auto()
+    BURNED = auto()
+    ASLEEP = auto()
+    PARALYZED = auto()
+    CONFUSED = auto()
+    COIN = auto()
+    RESULT = auto()
     UNKNOWN = auto()
