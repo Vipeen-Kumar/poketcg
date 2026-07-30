@@ -1,0 +1,2 @@
+# No third-party dependencies are required in this architecture phase.
+# The current scaffold uses only the Python standard library.
