@@ -1,22 +1,18 @@
-"""Deterministic decision engine and built-in rules."""
+"""Deterministic decision engine."""
 
 from __future__ import annotations
 
-import inspect
-from abc import ABC, abstractmethod
 from importlib import import_module
-from time import perf_counter
 
 from poketcg.actions import BaseAction
 
 from .context import DecisionContext
 from .exceptions import DecisionConfigurationError, EmptyLegalActionError, MissingFallbackRuleError, UnknownRuleError
-from .priority import DEFAULT_ALWAYS_END_TURN_PRIORITY, DEFAULT_FIRST_LEGAL_ACTION_PRIORITY, DEFAULT_FALLBACK_PRIORITY
 from .registry import RuleRegistry, get_default_registry
 from .results import DecisionOutcome, DecisionTrace, RuleResult
 
 
-class BaseRule(ABC):
+class BaseRule:
     """Reusable abstract rule interface."""
 
     rule_name: str | None = None
@@ -75,9 +71,10 @@ class BaseRule(ABC):
 
         return True
 
-    @abstractmethod
     def evaluate(self, context: DecisionContext) -> RuleResult:
         """Evaluate the rule and return a serializable result."""
+
+        raise NotImplementedError
 
     def _result(
         self,
@@ -100,95 +97,9 @@ class BaseRule(ABC):
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
-        if cls is BaseRule or inspect.isabstract(cls) or not getattr(cls, "auto_register", True):
+        if cls is BaseRule or not getattr(cls, "auto_register", True):
             return
         get_default_registry().register(cls())
-
-
-class AlwaysEndTurnRule(BaseRule):
-    """Generic rule that prefers ending the turn when legal."""
-
-    default_priority = DEFAULT_ALWAYS_END_TURN_PRIORITY
-
-    def applies(self, context: DecisionContext) -> bool:
-        return context.analyzer.end_turn_action() is not None
-
-    def evaluate(self, context: DecisionContext) -> RuleResult:
-        start = perf_counter()
-        action = context.analyzer.end_turn_action()
-        if action is None:
-            return self._result(
-                passed=False,
-                action=None,
-                reason="End turn is unavailable.",
-                metadata={"legal_action_count": len(context.legal_actions)},
-                execution_time=perf_counter() - start,
-            )
-        return self._result(
-            passed=True,
-            action=action,
-            reason="End turn is legal.",
-            metadata={"legal_action_count": len(context.legal_actions)},
-            execution_time=perf_counter() - start,
-        )
-
-
-class FirstLegalActionRule(BaseRule):
-    """Generic rule that selects the first legal action."""
-
-    default_priority = DEFAULT_FIRST_LEGAL_ACTION_PRIORITY
-
-    def applies(self, context: DecisionContext) -> bool:
-        return bool(context.legal_actions)
-
-    def evaluate(self, context: DecisionContext) -> RuleResult:
-        start = perf_counter()
-        if not context.legal_actions:
-            return self._result(
-                passed=False,
-                action=None,
-                reason="No legal actions are available.",
-                execution_time=perf_counter() - start,
-            )
-        action = context.legal_actions[0]
-        return self._result(
-            passed=True,
-            action=action,
-            reason="Selected the first legal action.",
-            metadata={"legal_action_count": len(context.legal_actions)},
-            execution_time=perf_counter() - start,
-        )
-
-
-class FallbackRule(BaseRule):
-    """Safety rule used when no other rule succeeds."""
-
-    default_priority = DEFAULT_FALLBACK_PRIORITY
-    is_fallback = True
-
-    def applies(self, context: DecisionContext) -> bool:
-        return bool(context.legal_actions)
-
-    def evaluate(self, context: DecisionContext) -> RuleResult:
-        start = perf_counter()
-        if not context.legal_actions:
-            return self._result(
-                passed=False,
-                action=None,
-                reason="No legal actions are available for fallback selection.",
-                execution_time=perf_counter() - start,
-            )
-
-        end_turn_action = context.analyzer.end_turn_action()
-        action = end_turn_action or context.legal_actions[0]
-        reason = "Fallback selected End Turn." if end_turn_action is not None else "Fallback selected the first legal action."
-        return self._result(
-            passed=True,
-            action=action,
-            reason=reason,
-            metadata={"legal_action_count": len(context.legal_actions), "fallback": True},
-            execution_time=perf_counter() - start,
-        )
 
 
 class DecisionEngine:

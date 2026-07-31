@@ -24,13 +24,14 @@ The repository now contains the core non-strategic layers that future agents and
 - typed action abstraction layer,
 - factual game analysis API,
 - deterministic decision engine,
+- Pokémon rule library,
 - replay and debug logging.
 
 ## Current Phase
 
-Current completed phase: Phase 6 - Decision Engine
+Current completed phase: Phase 8 - Rule Library
 
-This phase adds the reusable deterministic rule engine that evaluates registered rules, records execution traces, and returns one typed action without adding strategy or search.
+This phase adds the reusable Pokémon knowledge layer that owns gameplay rules while the deterministic decision engine simply executes them.
 
 ## Completed Phases
 
@@ -42,6 +43,7 @@ This phase adds the reusable deterministic rule engine that evaluates registered
 - Phase 5 - Game Analysis API
 - Phase 6 - Decision Engine
 - Phase 7 - Replay And Debug Logging
+- Phase 8 - Rule Library
 
 ## Major Modules Implemented
 
@@ -63,10 +65,13 @@ This phase adds the reusable deterministic rule engine that evaluates registered
 - `poketcg.decision`
   Deterministic rule execution, rule registration, fallback policy, and execution traces.
 
+- `poketcg.rules`
+  Pokémon knowledge layer containing reusable gameplay rules and automatic rule registration.
+
 - `poketcg.debug`
   Development-only replay capture, formatting, and replay file writing.
 
-- `tests.cards`, `tests.engine`, `tests.actions`, `tests.analysis`, `tests.decision`, `tests.debug`
+- `tests.cards`, `tests.engine`, `tests.actions`, `tests.analysis`, `tests.decision`, `tests.rules`, `tests.debug`
   Verification coverage for the currently implemented layers.
 
 ## Remaining Roadmap
@@ -83,7 +88,6 @@ This phase adds the reusable deterministic rule engine that evaluates registered
 - gameplay logic,
 - heuristics,
 - policy selection,
-- deterministic strategic decisioning beyond rule execution,
 - search behavior,
 - model feature encoding,
 - reinforcement learning,

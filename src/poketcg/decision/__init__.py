@@ -1,7 +1,7 @@
 """Deterministic decision-engine helpers."""
 
 from .context import DecisionContext, DecisionEngineConfig, DecisionTraceRecorder
-from .engine import AlwaysEndTurnRule, BaseRule, DecisionEngine, FirstLegalActionRule, FallbackRule
+from .engine import BaseRule, DecisionEngine
 from .exceptions import (
     CircularPriorityError,
     DecisionConfigurationError,
@@ -16,7 +16,6 @@ from .registry import DEFAULT_RULE_REGISTRY, RuleRegistry, get_default_registry,
 from .results import DecisionOutcome, DecisionTrace, RuleResult
 
 __all__ = [
-    "AlwaysEndTurnRule",
     "BaseRule",
     "CircularPriorityError",
     "DecisionConfigurationError",
@@ -29,8 +28,6 @@ __all__ = [
     "DecisionTraceRecorder",
     "DuplicateRuleNameError",
     "EmptyLegalActionError",
-    "FallbackRule",
-    "FirstLegalActionRule",
     "InvalidRuleError",
     "MissingFallbackRuleError",
     "DEFAULT_RULE_REGISTRY",

@@ -176,6 +176,20 @@ Future phases:
 - decision traces,
 - strategy orchestration on top of the rule engine.
 
+### `poketcg.rules`
+
+Why it exists:
+- Owns Pokémon-specific gameplay knowledge as reusable deterministic rules.
+
+Why it is separated:
+- The decision engine should remain generic and reusable while the Pokémon knowledge layer can evolve independently.
+
+Future phases:
+- attack, retreat, energy, evolution, supporter, item, stadium, ability, and fallback rules,
+- deck-specific heuristics,
+- aggressive/defensive/control rule packs,
+- plugin rule bundles.
+
 ### `poketcg.search`
 
 Why it exists:

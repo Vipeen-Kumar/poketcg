@@ -29,6 +29,8 @@ It does not:
 - train policies,
 - infer hidden information beyond the parsed state.
 
+The Pokémon-specific rule implementations live in [docs/rules.md](C:\Users\vipee\Desktop\study\project\poketcg\docs\rules.md) and the [src/poketcg/rules](C:\Users\vipee\Desktop\study\project\poketcg\src\poketcg\rules) package.
+
 ## Responsibilities
 
 The decision engine owns how a typed action is selected from a legal action set.
@@ -109,6 +111,8 @@ They receive a `DecisionContext` and return a `RuleResult`.
 7. If no rule passes, the fallback rule chooses a safe legal action.
 
 The engine never instantiates rules manually one by one.
+
+Applications typically import `poketcg.rules` once during startup so the built-in Pokémon rule library registers itself before the first decision.
 
 ## Rule Results
 
@@ -218,7 +222,7 @@ Strict mode is meant to surface bad configuration early rather than letting subt
 
 Likely future additions:
 
-- phase 7 strategic rules,
+- later strategic rules,
 - Pokémon-specific heuristics,
 - richer plugin loading for external rule packs,
 - more detailed trace summaries,
