@@ -23,13 +23,14 @@ The repository now contains the core non-strategic layers that future agents and
 - raw observation parser,
 - typed action abstraction layer,
 - factual game analysis API,
+- deterministic decision engine,
 - replay and debug logging.
 
 ## Current Phase
 
-Current completed phase: Phase 6 - Replay And Debug Logging
+Current completed phase: Phase 6 - Decision Engine
 
-This phase adds a development-only replay system that records parsed board state, legal typed actions, chosen actions, and optional decision metadata in Markdown and JSON formats.
+This phase adds the reusable deterministic rule engine that evaluates registered rules, records execution traces, and returns one typed action without adding strategy or search.
 
 ## Completed Phases
 
@@ -39,7 +40,8 @@ This phase adds a development-only replay system that records parsed board state
 - Phase 3 - Observation Parser
 - Phase 4 - Action System
 - Phase 5 - Game Analysis API
-- Phase 6 - Replay And Debug Logging
+- Phase 6 - Decision Engine
+- Phase 7 - Replay And Debug Logging
 
 ## Major Modules Implemented
 
@@ -58,10 +60,13 @@ This phase adds a development-only replay system that records parsed board state
 - `poketcg.analysis`
   Factual query layer over parsed observations and typed legal actions.
 
+- `poketcg.decision`
+  Deterministic rule execution, rule registration, fallback policy, and execution traces.
+
 - `poketcg.debug`
   Development-only replay capture, formatting, and replay file writing.
 
-- `tests.cards`, `tests.engine`, `tests.actions`, `tests.analysis`, `tests.debug`
+- `tests.cards`, `tests.engine`, `tests.actions`, `tests.analysis`, `tests.decision`, `tests.debug`
   Verification coverage for the currently implemented layers.
 
 ## Remaining Roadmap
@@ -78,6 +83,7 @@ This phase adds a development-only replay system that records parsed board state
 - gameplay logic,
 - heuristics,
 - policy selection,
+- deterministic strategic decisioning beyond rule execution,
 - search behavior,
 - model feature encoding,
 - reinforcement learning,
@@ -92,4 +98,5 @@ This phase adds a development-only replay system that records parsed board state
 - Parser reference: [docs/parser.md](C:\Users\vipee\Desktop\study\project\poketcg\docs\parser.md)
 - Action system reference: [docs/actions.md](C:\Users\vipee\Desktop\study\project\poketcg\docs\actions.md)
 - Analysis reference: [docs/analysis.md](C:\Users\vipee\Desktop\study\project\poketcg\docs\analysis.md)
+- Decision engine reference: [docs/decision_engine.md](C:\Users\vipee\Desktop\study\project\poketcg\docs\decision_engine.md)
 - Debug logging reference: [docs/debug_logging.md](C:\Users\vipee\Desktop\study\project\poketcg\docs\debug_logging.md)

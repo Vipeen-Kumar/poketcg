@@ -59,6 +59,13 @@ class MarkdownReplayFormatter:
         if snapshot.logs:
             lines.extend(["", "Logs", ""])
             lines.extend(f"- {entry}" for entry in snapshot.logs)
+        if snapshot.decision_trace is not None:
+            lines.extend(["", "Decision Trace", ""])
+            rule_results = snapshot.decision_trace.get("rule_results", [])
+            for entry in rule_results:
+                status = "PASSED" if entry.get("passed") else "FAILED"
+                reason = entry.get("reason") or ""
+                lines.append(f"- {entry.get('rule_name', 'UnknownRule')}: {status} - {reason}")
         return lines
 
     def _format_player(self, player: PlayerSnapshot | None) -> list[str]:

@@ -87,6 +87,7 @@ class TurnSnapshot:
     legal_actions: tuple[ActionRecord, ...] = ()
     chosen_action: ActionRecord | None = None
     decision_metadata: DecisionMetadata = field(default_factory=DecisionMetadata)
+    decision_trace: dict[str, object] | None = None
     logs: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, object]:

@@ -162,6 +162,20 @@ Future phases:
 - rule-based policy,
 - hybrid policy/search orchestration.
 
+### `poketcg.decision`
+
+Why it exists:
+- Owns deterministic rule execution, registry management, and safe fallback selection.
+
+Why it is separated:
+- The decision core should stay focused on how a typed action is selected, not on broader strategy orchestration or learning systems.
+
+Future phases:
+- built-in deterministic rules,
+- plugin rule loading,
+- decision traces,
+- strategy orchestration on top of the rule engine.
+
 ### `poketcg.search`
 
 Why it exists:

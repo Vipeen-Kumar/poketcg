@@ -9,6 +9,7 @@ from pathlib import Path
 from poketcg.actions import ActionFactory, ActionKind, BaseAction
 from poketcg.analysis import GameAnalyzer
 from poketcg.config import ReplayLoggingConfig
+from poketcg.decision.results import DecisionTrace
 from poketcg.domain import Observation, Player, Pokemon, PlayerSide
 
 from .models import ActionRecord, DecisionMetadata, PlayerSnapshot, PokemonSnapshot, ReplaySession, TurnSnapshot
@@ -89,6 +90,7 @@ class ReplayLogger:
         *,
         chosen_action: BaseAction | None = None,
         decision_metadata: DecisionMetadata | None = None,
+        decision_trace: DecisionTrace | None = None,
         analyzer: GameAnalyzer | None = None,
     ) -> TurnSnapshot | None:
         """Capture one decision-point snapshot."""
@@ -106,7 +108,8 @@ class ReplayLogger:
             opponent=self._player_snapshot(resolved_analyzer.opponent()),
             legal_actions=legal_actions,
             chosen_action=None if chosen_action is None else self._action_to_record(chosen_action),
-            decision_metadata=decision_metadata or DecisionMetadata(),
+            decision_metadata=decision_metadata or self._decision_metadata_from_trace(decision_trace),
+            decision_trace=None if decision_trace is None else decision_trace.to_dict(),
             logs=tuple(entry.event_name for entry in observation.logs),
         )
         self._session.log_turn(snapshot)
@@ -133,10 +136,21 @@ class ReplayLogger:
             legal_actions=previous.legal_actions,
             chosen_action=self._action_to_record(chosen_action),
             decision_metadata=decision_metadata or previous.decision_metadata,
+            decision_trace=previous.decision_trace,
             logs=previous.logs,
         )
         self._session.turns[-1] = updated
         return updated
+
+    def _decision_metadata_from_trace(self, decision_trace: DecisionTrace | None) -> DecisionMetadata:
+        if decision_trace is None or decision_trace.selected_result is None:
+            return DecisionMetadata()
+        selected_result = decision_trace.selected_result
+        return DecisionMetadata(
+            rule_name=selected_result.rule_name,
+            reason=selected_result.reason,
+            notes=decision_trace.fallback_reason,
+        )
 
     def finish(self, *, metadata: dict[str, object] | None = None) -> ReplaySession | None:
         """Finish and write the replay session."""
