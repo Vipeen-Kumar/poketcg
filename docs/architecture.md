@@ -122,6 +122,21 @@ Future phases:
 - replay analytics,
 - evaluation statistics.
 
+### `poketcg.debug`
+
+Why it exists:
+- Development-only replay capture and debugging support.
+
+Why it is separated:
+- Recording and formatting diagnostics should not leak into gameplay, parser, strategy, or search code.
+
+Future phases:
+- replay capture from baseline agents,
+- rule-engine decision traces,
+- search trace inspection,
+- training/debug artifacts,
+- replay visualization tooling.
+
 ### `poketcg.agent`
 
 Why it exists:

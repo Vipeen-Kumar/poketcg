@@ -12,6 +12,7 @@ PROJECT_ROOT = SRC_ROOT.parent
 DATA_DIR = PROJECT_ROOT / "data"
 DOCS_DIR = PROJECT_ROOT / "docs"
 TESTS_DIR = PROJECT_ROOT / "tests"
+OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
 
 @dataclass(slots=True, frozen=True)
@@ -24,8 +25,10 @@ class PathsConfig:
     data_dir: Path = DATA_DIR
     docs_dir: Path = DOCS_DIR
     tests_dir: Path = TESTS_DIR
+    outputs_dir: Path = OUTPUTS_DIR
     raw_data_dir: Path = DATA_DIR / "raw"
     processed_data_dir: Path = DATA_DIR / "processed"
+    replay_outputs_dir: Path = OUTPUTS_DIR / "replays"
     environment_doc: Path = DOCS_DIR / "environment.md"
     architecture_doc: Path = DOCS_DIR / "architecture.md"
     english_card_csv: Path = PROJECT_ROOT / "EN_Card_Data.csv"
@@ -68,6 +71,18 @@ class TrainingConfig:
 
 
 @dataclass(slots=True, frozen=True)
+class ReplayLoggingConfig:
+    """Runtime settings for development-only replay logging."""
+
+    enabled: bool = False
+    output_directory: Path = OUTPUTS_DIR / "replays"
+    write_markdown: bool = True
+    write_json: bool = True
+    maximum_saved_games: int = 100
+    compression: str | None = None
+
+
+@dataclass(slots=True, frozen=True)
 class ProjectConfig:
     """Top-level project configuration object."""
 
@@ -75,6 +90,7 @@ class ProjectConfig:
     environment: EnvironmentConfig = field(default_factory=EnvironmentConfig)
     runtime: RuntimeConfig = field(default_factory=RuntimeConfig)
     training: TrainingConfig = field(default_factory=TrainingConfig)
+    replay_logging: ReplayLoggingConfig = field(default_factory=ReplayLoggingConfig)
 
 
 def get_default_config() -> ProjectConfig:

@@ -22,13 +22,14 @@ The repository now contains the core non-strategic layers that future agents and
 - static English card database,
 - raw observation parser,
 - typed action abstraction layer,
-- factual game analysis API.
+- factual game analysis API,
+- replay and debug logging.
 
 ## Current Phase
 
-Current completed phase: Phase 5 - Game Analysis API
+Current completed phase: Phase 6 - Replay And Debug Logging
 
-This phase adds a reusable factual query layer over parsed observations and typed actions so future modules can ask for board, hand, Pokemon, and legal-action facts without manually inspecting `GameState`.
+This phase adds a development-only replay system that records parsed board state, legal typed actions, chosen actions, and optional decision metadata in Markdown and JSON formats.
 
 ## Completed Phases
 
@@ -38,6 +39,7 @@ This phase adds a reusable factual query layer over parsed observations and type
 - Phase 3 - Observation Parser
 - Phase 4 - Action System
 - Phase 5 - Game Analysis API
+- Phase 6 - Replay And Debug Logging
 
 ## Major Modules Implemented
 
@@ -56,7 +58,10 @@ This phase adds a reusable factual query layer over parsed observations and type
 - `poketcg.analysis`
   Factual query layer over parsed observations and typed legal actions.
 
-- `tests.cards`, `tests.engine`, `tests.actions`, `tests.analysis`
+- `poketcg.debug`
+  Development-only replay capture, formatting, and replay file writing.
+
+- `tests.cards`, `tests.engine`, `tests.actions`, `tests.analysis`, `tests.debug`
   Verification coverage for the currently implemented layers.
 
 ## Remaining Roadmap
@@ -87,3 +92,4 @@ This phase adds a reusable factual query layer over parsed observations and type
 - Parser reference: [docs/parser.md](C:\Users\vipee\Desktop\study\project\poketcg\docs\parser.md)
 - Action system reference: [docs/actions.md](C:\Users\vipee\Desktop\study\project\poketcg\docs\actions.md)
 - Analysis reference: [docs/analysis.md](C:\Users\vipee\Desktop\study\project\poketcg\docs\analysis.md)
+- Debug logging reference: [docs/debug_logging.md](C:\Users\vipee\Desktop\study\project\poketcg\docs\debug_logging.md)
