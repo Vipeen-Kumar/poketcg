@@ -13,9 +13,9 @@ This repository is intentionally modular. The final Kaggle submission will event
 
 ## Project Status
 
-Status: Foundation layers implemented
+Status: Core infrastructure plus first playable agent implemented
 
-The repository now contains the core non-strategic layers that future agents and training systems will build on:
+The repository now contains:
 
 - environment documentation,
 - modular project architecture,
@@ -24,14 +24,15 @@ The repository now contains the core non-strategic layers that future agents and
 - typed action abstraction layer,
 - factual game analysis API,
 - deterministic decision engine,
-- Pokémon rule library,
-- replay and debug logging.
+- PokÃ©mon rule library,
+- replay and debug logging,
+- the first fully playable baseline agent.
 
 ## Current Phase
 
-Current completed phase: Phase 8 - Rule Library
+Current completed phase: Phase 9 - Baseline Agent
 
-This phase adds the reusable Pokémon knowledge layer that owns gameplay rules while the deterministic decision engine simply executes them.
+This phase adds the first end-to-end playable agent that reuses the parser, action system, analyzer, decision engine, rule library, and replay logger to play legal games from start to finish.
 
 ## Completed Phases
 
@@ -44,6 +45,7 @@ This phase adds the reusable Pokémon knowledge layer that owns gameplay rules w
 - Phase 6 - Decision Engine
 - Phase 7 - Replay And Debug Logging
 - Phase 8 - Rule Library
+- Phase 9 - Baseline Agent
 
 ## Major Modules Implemented
 
@@ -66,28 +68,29 @@ This phase adds the reusable Pokémon knowledge layer that owns gameplay rules w
   Deterministic rule execution, rule registration, fallback policy, and execution traces.
 
 - `poketcg.rules`
-  Pokémon knowledge layer containing reusable gameplay rules and automatic rule registration.
+  PokÃ©mon knowledge layer containing reusable gameplay rules and automatic rule registration.
 
 - `poketcg.debug`
   Development-only replay capture, formatting, and replay file writing.
 
-- `tests.cards`, `tests.engine`, `tests.actions`, `tests.analysis`, `tests.decision`, `tests.rules`, `tests.debug`
+- `poketcg.agent`
+  Thin submission-facing orchestration over deck selection, parsed gameplay decisions, and replay-integrated rule execution.
+
+- `tests.cards`, `tests.engine`, `tests.actions`, `tests.analysis`, `tests.decision`, `tests.rules`, `tests.debug`, `tests.agent`, `tests.integration`
   Verification coverage for the currently implemented layers.
 
 ## Remaining Roadmap
 
-- Agent-facing orchestration and submission boundary wiring.
-- Rule-based baseline strategy layer.
+- Stronger rule-based strategy layers.
 - Search abstractions and MCTS.
 - Encoding layer for model inputs and action representations.
 - Reinforcement learning and self-play infrastructure.
 - Evaluation and benchmarking systems.
+- Final Kaggle submission packaging around `main.py` and `deck.csv`.
 
 ## Not Yet Implemented
 
-- gameplay logic,
-- heuristics,
-- policy selection,
+- advanced heuristics,
 - search behavior,
 - model feature encoding,
 - reinforcement learning,
@@ -103,4 +106,6 @@ This phase adds the reusable Pokémon knowledge layer that owns gameplay rules w
 - Action system reference: [docs/actions.md](C:\Users\vipee\Desktop\study\project\poketcg\docs\actions.md)
 - Analysis reference: [docs/analysis.md](C:\Users\vipee\Desktop\study\project\poketcg\docs\analysis.md)
 - Decision engine reference: [docs/decision_engine.md](C:\Users\vipee\Desktop\study\project\poketcg\docs\decision_engine.md)
+- Rules reference: [docs/rules.md](C:\Users\vipee\Desktop\study\project\poketcg\docs\rules.md)
 - Debug logging reference: [docs/debug_logging.md](C:\Users\vipee\Desktop\study\project\poketcg\docs\debug_logging.md)
+- Baseline agent reference: [docs/baseline_agent.md](C:\Users\vipee\Desktop\study\project\poketcg\docs\baseline_agent.md)
