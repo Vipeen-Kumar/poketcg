@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
+
 from poketcg.decision import DecisionEngineConfig
 from poketcg.debug.replay_logger import ReplayLoggerConfig
 

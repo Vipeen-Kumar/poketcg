@@ -1,2 +1,3 @@
-# No third-party dependencies are required in this architecture phase.
-# The current scaffold uses only the Python standard library.
+# Core submission/runtime code uses only the Python standard library.
+# Local official matches via run_local.py additionally require:
+# kaggle-environments>=1.14.10
