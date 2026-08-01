@@ -48,6 +48,28 @@ class FakeEnvironment:
         return "<html><body>fake replay</body></html>"
 
 
+class RecordingAgent:
+    """Small callable used to verify wrapper argument forwarding."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def __call__(self, *args, **kwargs):
+        self.calls.append((args, kwargs))
+        return [0]
+
+
+class ObservationOnlyAgent:
+    """Callable that only accepts the observation positional argument."""
+
+    def __init__(self) -> None:
+        self.calls: list[object] = []
+
+    def __call__(self, observation):
+        self.calls.append(observation)
+        return [1]
+
+
 class LocalRunnerTestCase(unittest.TestCase):
     """Verify the repository-level local-runner behavior."""
 
@@ -66,17 +88,13 @@ class LocalRunnerTestCase(unittest.TestCase):
         self.assertEqual(args.html, "out.html")
 
     def test_missing_sdk_is_reported_cleanly(self) -> None:
-        stderr = io.StringIO()
         with patch.object(
             self.module,
             "load_kaggle_make",
             side_effect=self.module.LocalRunnerError("kaggle-environments missing"),
         ):
-            with redirect_stderr(stderr):
-                exit_code = self.module.main([])
-
-        self.assertEqual(exit_code, 1)
-        self.assertIn("kaggle-environments missing", stderr.getvalue())
+            with self.assertRaisesRegex(self.module.LocalRunnerError, "kaggle-environments missing"):
+                self.module.main([])
 
     def test_runner_completes_with_mocked_sdk(self) -> None:
         stdout = io.StringIO()
@@ -98,6 +116,32 @@ class LocalRunnerTestCase(unittest.TestCase):
             self.assertIn("HTML replay written", stdout.getvalue())
         finally:
             output_path.unlink(missing_ok=True)
+
+    def test_diagnostic_wrapper_accepts_observation_and_configuration(self) -> None:
+        wrapped_agent = RecordingAgent()
+        wrapper = self.module.DiagnosticAgentWrapper(wrapped_agent, name="agent0")
+        observation = {"logs": [], "current": None, "select": None}
+        configuration = {"episodeSteps": 1}
+
+        result = wrapper(observation, configuration)
+
+        self.assertEqual(result, [0])
+        self.assertEqual(wrapper.last_observation, observation)
+        self.assertEqual(wrapper.last_callback, "deck selection")
+        self.assertEqual(wrapped_agent.calls, [((observation, configuration), {})])
+
+    def test_diagnostic_wrapper_falls_back_to_observation_only_agent(self) -> None:
+        wrapped_agent = ObservationOnlyAgent()
+        wrapper = self.module.DiagnosticAgentWrapper(wrapped_agent, name="agent0")
+        observation = {"logs": [], "current": None, "select": None}
+        configuration = {"episodeSteps": 1}
+
+        result = wrapper(observation, configuration)
+
+        self.assertEqual(result, [1])
+        self.assertEqual(wrapper.last_observation, observation)
+        self.assertEqual(wrapper.last_callback, "deck selection")
+        self.assertEqual(wrapped_agent.calls, [observation])
 
 
 if __name__ == "__main__":

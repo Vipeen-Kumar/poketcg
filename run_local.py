@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import importlib
 import sys
+import traceback
 from pathlib import Path
+from pprint import pformat
 from typing import Sequence
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -20,6 +23,111 @@ from poketcg.debug.replay_logger import ReplayLoggerConfig
 
 class LocalRunnerError(RuntimeError):
     """Raised when the local Kaggle runner cannot be started."""
+
+
+class DiagnosticAgentWrapper:
+    """Thin diagnostic wrapper that records the last observation and callback stage."""
+
+    def __init__(self, agent, *, name: str) -> None:
+        self._agent = agent
+        self.name = name
+        self.last_observation: object | None = None
+        self.last_callback: str | None = None
+        self._agent_signature = inspect.signature(agent)
+        self._instrument_agent()
+
+    def _instrument_agent(self) -> None:
+        self._wrap_method(self._agent, "select_deck", callback_name="deck selection")
+
+        parser = getattr(self._agent, "_observation_parser", None)
+        if parser is not None:
+            self._wrap_method(parser, "parse", callback_name="observation parsing")
+
+        decision_engine = getattr(self._agent, "_decision_engine", None)
+        if decision_engine is not None:
+            self._wrap_method(decision_engine, "decide", callback_name="action selection")
+
+        replay_logger = getattr(self._agent, "_replay_logger", None)
+        if replay_logger is not None:
+            for method_name in ("start_game", "log_turn", "log_action", "finish"):
+                self._wrap_method(replay_logger, method_name, callback_name="replay logger")
+
+    def _wrap_method(self, target: object, method_name: str, *, callback_name: str) -> None:
+        original = getattr(target, method_name, None)
+        if original is None or not callable(original):
+            return
+
+        def wrapped(*args, **kwargs):
+            self.last_callback = callback_name
+            try:
+                return original(*args, **kwargs)
+            except Exception:
+                _print_failure_banner(f"{self.name}: {callback_name}")
+                _print_traceback()
+                _print_last_observation(self.last_observation, self.name)
+                raise
+
+        setattr(target, method_name, wrapped)
+
+    def __call__(self, *args, **kwargs) -> object:
+        observation = args[0] if args else kwargs.get("observation")
+        self.last_observation = observation
+        self.last_callback = "deck selection" if _is_deck_selection_payload(observation) else "action selection"
+        try:
+            return self._invoke_agent(*args, **kwargs)
+        except Exception:
+            _print_failure_banner(f"{self.name}: agent callback")
+            _print_traceback()
+            _print_last_observation(self.last_observation, self.name)
+            raise
+
+    def _invoke_agent(self, *args, **kwargs) -> object:
+        try:
+            self._agent_signature.bind(*args, **kwargs)
+        except TypeError:
+            observation = args[0] if args else kwargs.get("observation")
+            return self._agent(observation)
+        return self._agent(*args, **kwargs)
+
+
+def _is_deck_selection_payload(observation: object) -> bool:
+    if not isinstance(observation, dict):
+        return False
+    return observation.get("current") is None and observation.get("select") is None
+
+
+def _print_failure_banner(callback_name: str) -> None:
+    print(f"[Diagnostic] Callback failed: {callback_name}", file=sys.stderr)
+
+
+def _print_traceback() -> None:
+    print("[Diagnostic] Python traceback follows:", file=sys.stderr)
+    traceback.print_exc()
+
+
+def _print_last_observation(observation: object, agent_name: str) -> None:
+    print(f"[Diagnostic] Last observation passed to {agent_name}:", file=sys.stderr)
+    print(pformat(observation, width=120), file=sys.stderr)
+
+
+def _print_environment_details(env: object) -> None:
+    state = getattr(env, "state", None)
+    logs = getattr(env, "logs", None)
+    if state is not None:
+        print("[Diagnostic] env.state:", file=sys.stderr)
+        print(pformat(state, width=120), file=sys.stderr)
+    if logs is not None:
+        print("[Diagnostic] env.logs:", file=sys.stderr)
+        print(pformat(logs, width=120), file=sys.stderr)
+
+
+def _print_all_agent_observations(agents: Sequence[DiagnosticAgentWrapper]) -> None:
+    for agent in agents:
+        print(
+            f"[Diagnostic] {agent.name} last callback: {agent.last_callback}",
+            file=sys.stderr,
+        )
+        _print_last_observation(agent.last_observation, agent.name)
 
 
 def build_argument_parser() -> argparse.ArgumentParser:
@@ -145,29 +253,43 @@ def run_local_games(*, games: int, replay: bool, seed: int | None, html_path: st
                 },
                 debug=True,
             )
-        except Exception as error:
-            raise LocalRunnerError(
-                "Failed to create the official `cabt` environment through `kaggle_environments.make(\"cabt\")`.\n"
-                "Confirm that your installed `kaggle-environments` build includes the `cabt` environment."
-            ) from error
+        except Exception:
+            _print_failure_banner("environment creation")
+            _print_traceback()
+            raise
 
-        agent0 = build_local_agent(replay_enabled=replay, game_id_prefix=f"local_game_{game_number:03d}_p0")
-        agent1 = build_local_agent(replay_enabled=replay, game_id_prefix=f"local_game_{game_number:03d}_p1")
+        agent0 = DiagnosticAgentWrapper(
+            build_local_agent(replay_enabled=replay, game_id_prefix=f"local_game_{game_number:03d}_p0"),
+            name="agent0",
+        )
+        agent1 = DiagnosticAgentWrapper(
+            build_local_agent(replay_enabled=replay, game_id_prefix=f"local_game_{game_number:03d}_p1"),
+            name="agent1",
+        )
+        agents = (agent0, agent1)
 
         print(f"[Game {game_number}/{games}] Running BaselineAgent vs BaselineAgent.")
         try:
             steps = env.run([agent0, agent1])
-        except Exception as error:
-            raise LocalRunnerError(
-                "The official cabt environment failed while running the local match.\n"
-                "Re-run with a supported `kaggle-environments` installation and check the environment error output."
-            ) from error
+        except Exception:
+            _print_failure_banner("environment step")
+            _print_traceback()
+            _print_environment_details(env)
+            _print_all_agent_observations(agents)
+            raise
 
         final_step = steps[-1]
         statuses = [state.status for state in final_step]
         rewards = [state.reward for state in final_step]
         output_path = _html_output_path(base_html_path, game_number, games)
-        save_result_html(env, output_path)
+        try:
+            save_result_html(env, output_path)
+        except Exception:
+            _print_failure_banner("environment step")
+            _print_traceback()
+            _print_environment_details(env)
+            _print_all_agent_observations(agents)
+            raise
         print(f"[Game {game_number}/{games}] Statuses: {statuses} | Rewards: {rewards}")
         print(f"[Game {game_number}/{games}] HTML replay written to {output_path}.")
 
@@ -181,11 +303,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     parser = build_argument_parser()
     args = parser.parse_args(argv)
-    try:
-        return run_local_games(games=args.games, replay=args.replay, seed=args.seed, html_path=args.html)
-    except LocalRunnerError as error:
-        print(str(error), file=sys.stderr)
-        return 1
+    return run_local_games(games=args.games, replay=args.replay, seed=args.seed, html_path=args.html)
 
 
 if __name__ == "__main__":
