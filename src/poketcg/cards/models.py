@@ -134,3 +134,6 @@ class CardData:
 
     def is_pokemon(self) -> bool:
         return self.card_type is CardType.POKEMON
+
+    def is_ace_spec(self) -> bool:
+        return self.rule == "ACE SPEC" or self.category == "ACE SPEC"

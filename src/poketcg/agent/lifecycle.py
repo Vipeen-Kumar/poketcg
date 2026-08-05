@@ -20,8 +20,14 @@ class AgentLifecycle:
 
         if isinstance(observation, Observation):
             return observation.state is None and observation.selection is None
-        current = observation.get("current")
-        select = observation.get("select")
+        
+        # Check if observation is wrapped in "observation" key (Kaggle format)
+        observation_data = observation
+        if "observation" in observation and isinstance(observation["observation"], Mapping):
+            observation_data = observation["observation"]
+        
+        current = observation_data.get("current")
+        select = observation_data.get("select")
         return current is None and select is None
 
     @staticmethod
@@ -40,7 +46,12 @@ class AgentLifecycle:
     def emergency_first_legal_action(observation: RawObservation) -> SubmissionResponse | None:
         """Return a last-resort raw legal selection when typed parsing fails."""
 
-        select = observation.get("select")
+        # Check if observation is wrapped in "observation" key (Kaggle format)
+        observation_data = observation
+        if "observation" in observation and isinstance(observation["observation"], Mapping):
+            observation_data = observation["observation"]
+        
+        select = observation_data.get("select")
         if not isinstance(select, Mapping):
             return None
         options = select.get("option")

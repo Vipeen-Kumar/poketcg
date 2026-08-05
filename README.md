@@ -19,12 +19,13 @@ The repository currently includes:
 - deterministic decision engine,
 - rule library,
 - replay/debug logging,
+- deck validation,
 - baseline agent orchestration,
 - Kaggle-compatible entrypoint and submission packaging.
 
 ## Current Phase
 
-Current completed phase: Phase 10 - Local Runner And Kaggle Submission Entrypoint
+Current completed phase: Phase 11 - Deck Validation Subsystem
 
 This repository now has:
 
@@ -45,6 +46,7 @@ This repository now has:
 - Rules reference: [docs/rules.md](docs/rules.md)
 - Debug logging reference: [docs/debug_logging.md](docs/debug_logging.md)
 - Baseline agent reference: [docs/baseline_agent.md](docs/baseline_agent.md)
+- Deck validation reference: [docs/deck_validation.md](docs/deck_validation.md)
 
 # Running the Project
 
@@ -54,9 +56,9 @@ This repository now has:
   `C:\Users\vipee\Desktop\study\project\poketcg`
 - Verified Python version: `Python 3.13`
 - Core submission/runtime dependencies: Python standard library only
-- Local official match dependency: `kaggle-environments`
+- Local official match dependency: `kaggle-environments>=1.14.10`
 
-The official competition page states that submissions are executed from `/kaggle_simulations/agent/`, and the submission bundle must contain `main.py` at the root plus `deck.csv`. The current implementation also needs `src/poketcg/` and `EN_Card_Data.csv`, so the packaging script includes those runtime files automatically.
+The official competition page states that submissions are executed from `/kaggle_simulations/agent/`, and the submission bundle must contain `main.py` at the root plus `deck.csv`. The current implementation also includes `src/poketcg/` and `EN_Card_Data.csv` in the submission archive so the packaged project can import its own runtime modules.
 
 ## Installation
 
@@ -75,8 +77,8 @@ pip install "kaggle-environments>=1.14.10"
 Notes:
 
 - The official `cabt` getting-started example uses `from kaggle_environments import make`.
-- As of the official Kaggle competition page crawled on August 1, 2026, the competition description references code and configuration "as of kaggle-environments 1.14.10".
-- The current `kaggle-environments` repository `pyproject.toml` shows a newer package version, so `>=1.14.10` is the safest documented lower bound from the competition materials.
+- The competition description references code and configuration as of `kaggle-environments 1.14.10`.
+- The local runner and submission builder both validate the baseline deck before the official SDK is invoked.
 
 ## Installing cabt Dependencies
 
@@ -139,10 +141,7 @@ python run_local.py --games 3 --replay
 python run_local.py --games 1 --html result.html
 ```
 
-Observed behavior on this machine on August 1, 2026:
-
-- `python run_local.py` currently exits cleanly with a helpful message because `kaggle-environments` is not installed in this workspace.
-- No confusing traceback is produced.
+If `kaggle-environments` is missing, the runner prints a helpful install message instead of raising a confusing traceback.
 
 ## Generating result.html
 
@@ -209,6 +208,7 @@ The builder verifies:
 
 - `main.py` exists at the repository root,
 - `deck.csv` exists and contains exactly 60 integer card IDs,
+- `deck.csv` passes deck legality validation,
 - `deck.csv` matches the current submission agent deck,
 - `EN_Card_Data.csv` exists,
 - the runtime package files required by the current implementation are present,
@@ -249,7 +249,10 @@ The submission deck file must:
 
 - exist at the repository root,
 - contain exactly 60 lines with integer card IDs,
+- obey the deck legality rules enforced by `src/poketcg/deck/`,
 - match the current `BaselineAgent` submission deck.
+
+If the error mentions an ACE SPEC card, the deck contains more than one copy of a card whose metadata marks it as ACE SPEC.
 
 ### `ModuleNotFoundError: No module named 'poketcg'`
 

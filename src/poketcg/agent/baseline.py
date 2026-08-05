@@ -10,6 +10,7 @@ import poketcg.rules  # noqa: F401  # Ensure built-in rules register with the sh
 from poketcg.actions import ActionBatch, ActionFactory, BaseAction
 from poketcg.analysis import GameAnalyzer
 from poketcg.cards import CardDatabase
+from poketcg.deck import DeckValidator
 from poketcg.decision import DecisionContext, DecisionEngine, DecisionOutcome, DecisionTrace, RuleResult
 from poketcg.debug import DecisionMetadata, ReplayLogger
 from poketcg.domain import ActionSelection, CardType, Deck, Observation, PokemonType, Stage
@@ -51,8 +52,10 @@ class BaselineAgent(BaseAgent):
         self._decision_engine = decision_engine
         self._replay_logger = replay_logger
         self._fallback_rule = FallbackRule()
+        self._deck_validator = DeckValidator(card_database)
         self._game_counter = 0
         self._deck = self._build_deterministic_deck()
+        self._deck_validator.validate_or_raise(self._deck)
 
     @property
     def replay_logger(self) -> ReplayLogger:
@@ -82,10 +85,22 @@ class BaselineAgent(BaseAgent):
     def handle_observation(self, raw_observation: RawObservation | Observation) -> SubmissionResponse:
         """Handle a raw Kaggle observation or parsed observation end to end."""
 
+        # Debug logging
+        import sys
+        print(f"[DEBUG] Raw observation keys: {list(raw_observation.keys()) if isinstance(raw_observation, dict) else 'not dict'}", file=sys.stderr)
+        if isinstance(raw_observation, dict):
+            print(f"[DEBUG] current value: {raw_observation.get('current')}", file=sys.stderr)
+            print(f"[DEBUG] select value: {raw_observation.get('select')}", file=sys.stderr)
+            print(f"[DEBUG] step value: {raw_observation.get('step')}", file=sys.stderr)
+            print(f"[DEBUG] logs value (len): {len(raw_observation.get('logs', [])) if isinstance(raw_observation.get('logs'), list) else 'not list'}", file=sys.stderr)
+
         if AgentLifecycle.is_deck_selection_payload(raw_observation):
+            print("[DEBUG] Detected as deck selection payload", file=sys.stderr)
             self._ensure_game_started()
+            print("[DEBUG] Returning actual deck", file=sys.stderr)
             return AgentLifecycle.serialize_deck(self.select_deck())
 
+        print("[DEBUG] Detected as regular observation", file=sys.stderr)
         try:
             parsed = raw_observation if isinstance(raw_observation, Observation) else self._observation_parser.parse(raw_observation)
             return AgentLifecycle.serialize_action_selection(self.act(parsed))
@@ -223,6 +238,7 @@ class BaselineAgent(BaseAgent):
             card
             for card in self._card_database.all_cards()
             if card.card_type in {CardType.ITEM, CardType.SUPPORTER, CardType.STADIUM, CardType.TOOL}
+            and not card.is_ace_spec()
         ]
         if len(trainer_pool) < 5:
             raise ValueError("Card database does not contain enough Trainer cards to build the baseline deck.")

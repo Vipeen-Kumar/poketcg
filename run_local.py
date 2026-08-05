@@ -17,7 +17,9 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from main import create_submission_agent
+from poketcg.cards import CardDatabase
 from poketcg.agent import BaselineAgentConfig, create_baseline_agent
+from poketcg.deck import DeckLoader
 from poketcg.debug.replay_logger import ReplayLoggerConfig
 
 
@@ -33,7 +35,12 @@ class DiagnosticAgentWrapper:
         self.name = name
         self.last_observation: object | None = None
         self.last_callback: str | None = None
-        self._agent_signature = inspect.signature(agent)
+        self._agent_signature = None
+        if callable(agent):
+            try:
+                self._agent_signature = inspect.signature(agent)
+            except (TypeError, ValueError):
+                self._agent_signature = None
         self._instrument_agent()
 
     def _instrument_agent(self) -> None:
@@ -82,18 +89,27 @@ class DiagnosticAgentWrapper:
             raise
 
     def _invoke_agent(self, *args, **kwargs) -> object:
-        try:
-            self._agent_signature.bind(*args, **kwargs)
-        except TypeError:
-            observation = args[0] if args else kwargs.get("observation")
-            return self._agent(observation)
+        if not callable(self._agent):
+            return self._agent
+        if self._agent_signature is not None:
+            try:
+                self._agent_signature.bind(*args, **kwargs)
+            except TypeError:
+                observation = args[0] if args else kwargs.get("observation")
+                return self._agent(observation)
         return self._agent(*args, **kwargs)
 
 
 def _is_deck_selection_payload(observation: object) -> bool:
     if not isinstance(observation, dict):
         return False
-    return observation.get("current") is None and observation.get("select") is None
+    
+    # Check if observation is wrapped in "observation" key (Kaggle format)
+    observation_data = observation
+    if "observation" in observation and isinstance(observation["observation"], dict):
+        observation_data = observation["observation"]
+    
+    return observation_data.get("current") is None and observation_data.get("select") is None
 
 
 def _print_failure_banner(callback_name: str) -> None:
@@ -195,22 +211,11 @@ def load_deck_csv(path: Path | None = None) -> list[int]:
     """Load the submission deck from deck.csv."""
 
     deck_path = path or (PROJECT_ROOT / "deck.csv")
-    if not deck_path.exists():
-        raise LocalRunnerError(f"Required deck file not found: {deck_path}")
-
-    deck: list[int] = []
-    for line_number, raw_line in enumerate(deck_path.read_text(encoding="utf-8").splitlines(), start=1):
-        stripped = raw_line.strip()
-        if not stripped:
-            continue
-        try:
-            deck.append(int(stripped))
-        except ValueError as error:
-            raise LocalRunnerError(f"Invalid card id in {deck_path} on line {line_number}: {stripped!r}") from error
-
-    if len(deck) != 60:
-        raise LocalRunnerError(f"{deck_path} must contain exactly 60 card ids; found {len(deck)}.")
-    return deck
+    card_database = CardDatabase()
+    card_database.load()
+    loader = DeckLoader(card_database)
+    deck = loader.load(deck_path)
+    return list(deck.card_ids)
 
 
 def save_result_html(env, output_path: Path) -> None:

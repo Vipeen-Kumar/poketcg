@@ -15,6 +15,8 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from main import create_submission_agent
+from poketcg.cards import CardDatabase
+from poketcg.deck import DeckLoader, DeckLoadError, DeckValidationError
 
 
 class SubmissionBuildError(RuntimeError):
@@ -36,19 +38,14 @@ def load_deck_csv(path: Path) -> list[int]:
     if not path.exists():
         raise SubmissionBuildError(f"Missing required submission file: {path}")
 
-    deck: list[int] = []
-    for line_number, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-        stripped = raw_line.strip()
-        if not stripped:
-            continue
-        try:
-            deck.append(int(stripped))
-        except ValueError as error:
-            raise SubmissionBuildError(f"Invalid deck.csv value on line {line_number}: {stripped!r}") from error
-
-    if len(deck) != 60:
-        raise SubmissionBuildError(f"deck.csv must contain exactly 60 card ids; found {len(deck)}.")
-    return deck
+    card_database = CardDatabase()
+    card_database.load()
+    loader = DeckLoader(card_database)
+    try:
+        deck = loader.load(path)
+    except (DeckLoadError, DeckValidationError) as error:
+        raise SubmissionBuildError(str(error)) from error
+    return list(deck.card_ids)
 
 
 def verify_submission_inputs() -> dict[str, Path]:
@@ -89,6 +86,7 @@ def build_archive(output_path: Path, files: dict[str, Path]) -> Path:
 
     runtime_dirs = (
         "actions",
+        "deck",
         "agent",
         "analysis",
         "cards",

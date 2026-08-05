@@ -60,6 +60,7 @@ It does not:
 The baseline agent is responsible for:
 
 - selecting a deterministic valid deck,
+- validating that deck before startup completes,
 - detecting deck-selection versus gameplay observations,
 - parsing gameplay observations,
 - building typed actions,
@@ -78,7 +79,8 @@ When the payload is the initial deck-selection handshake:
 
 - no parsed state exists,
 - no legal selection exists,
-- the agent returns the deterministic baseline deck as a list of 60 card ids.
+- the agent returns the deterministic baseline deck as a list of 60 card ids,
+- the deck is validated against the shared deck subsystem during startup so illegal decks fail fast.
 
 ## Gameplay
 
@@ -127,6 +129,8 @@ Current construction:
 This deck builder is not an optimizer.
 
 It only guarantees a stable 60-card deck for baseline gameplay.
+
+It also avoids ACE SPEC copy-limit violations so the deck remains legal under the official `cabt` rules.
 
 ## Future Extension Points
 

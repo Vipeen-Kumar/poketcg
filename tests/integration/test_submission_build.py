@@ -48,6 +48,7 @@ class SubmissionBuildTestCase(unittest.TestCase):
             self.assertIn("deck.csv", members)
             self.assertIn("EN_Card_Data.csv", members)
             self.assertIn("src/poketcg/agent/baseline.py", members)
+            self.assertIn("src/poketcg/deck/validator.py", members)
             self.assertNotIn("src/poketcg/__pycache__/__init__.cpython-313.pyc", members)
             self.assertNotIn("src/poketcg/search/interfaces.py", members)
         finally:
