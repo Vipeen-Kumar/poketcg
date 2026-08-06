@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from itertools import combinations
 
 from poketcg.cards.models import AbilityData, AttackData
 from poketcg.domain import (
@@ -52,15 +53,83 @@ class ActionFactory:
     def from_selection(self, selection: SelectPrompt, *, state: GameState | None = None) -> tuple[BaseAction, ...]:
         """Build typed actions from a parsed selection prompt."""
 
+        # Check if this is a multi-select context (minCount > 1)
+        if selection.min_count > 1:
+            return self._build_combination_actions(selection, state=state)
+        
+        # Single-selection: existing behavior
         attack_metadata_queue = self._attack_metadata_queue(selection, state)
         actions: list[BaseAction] = []
         
-        # For now, only support single-selection (existing behavior)
-        # Multi-selection support can be added in future if needed
         for option_index, option in enumerate(selection.options):
             attack_metadata = attack_metadata_queue.pop(0) if option.option_type is OptionType.ATTACK and attack_metadata_queue else None
             actions.append(self._build_action(option_index, selection, option, state=state, attack_metadata=attack_metadata))
         return tuple(actions)
+
+    def _build_combination_actions(self, selection: SelectPrompt, *, state: GameState | None = None) -> tuple[BaseAction, ...]:
+        """Build all valid combination actions for multi-select contexts.
+        
+        Generates all combinations from min_count to max_count indices.
+        Each combination is represented as a single BaseAction with multiple selected_indices.
+        """
+        actions: list[BaseAction] = []
+        option_indices = list(range(len(selection.options)))
+        
+        # Generate all combinations of required sizes
+        for combo_size in range(selection.min_count, selection.max_count + 1):
+            for combo_indices in combinations(option_indices, combo_size):
+                # Build action for this combination
+                action = self._build_combination_action(combo_indices, selection, state=state)
+                actions.append(action)
+        
+        return tuple(actions)
+
+    def _build_combination_action(
+        self,
+        combo_indices: tuple[int, ...],
+        selection: SelectPrompt,
+        *,
+        state: GameState | None = None,
+    ) -> BaseAction:
+        """Build a single action representing a combination of selected indices."""
+        import sys
+        # Get first option for metadata (represents primary selection)
+        first_option = selection.options[combo_indices[0]]
+        
+        # Common fields for all combination actions
+        base_kwargs = {
+            "selected_indices": combo_indices,
+            "option": first_option,
+            "selection_context": selection.context,
+            "selection_type": selection.selection_type,
+            "metadata": dict(first_option.metadata),
+        }
+        
+        # Determine action type based on first option
+        # For multi-card selections, use CardChoiceAction
+        if first_option.option_type in {OptionType.CARD, OptionType.TOOL_CARD, OptionType.ENERGY_CARD, OptionType.DISCARD, OptionType.SKILL}:
+            action = CardChoiceAction(
+                kind=ActionKind.CHOOSE_CARD,
+                chosen_card=first_option.card,
+                chosen_zone=first_option.zone,
+                chosen_index=first_option.zone_index,
+                chosen_owner=first_option.owner,
+                **base_kwargs,
+            )
+            print(f"[TRACE-FACTORY] Created CardChoiceAction combo={combo_indices} id={id(action)} selected_indices={action.selected_indices}", file=sys.stderr)
+            return action
+        
+        # For other option types, use generic ChoiceAction
+        action = ChoiceAction(
+            kind=ActionKind.CHOOSE_CARD,
+            chosen_card=first_option.card,
+            chosen_zone=first_option.zone,
+            chosen_index=first_option.zone_index,
+            chosen_owner=first_option.owner,
+            **base_kwargs,
+        )
+        print(f"[TRACE-FACTORY] Created ChoiceAction combo={combo_indices} id={id(action)} selected_indices={action.selected_indices}", file=sys.stderr)
+        return action
 
     def _build_action(
         self,

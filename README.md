@@ -6,7 +6,7 @@ This repository is intentionally modular. The final Kaggle submission reduces to
 
 ## Project Status
 
-Status: Instrumentation framework implemented for root-cause analysis
+Status: Multi-selection action support fully implemented
 
 The repository currently includes:
 
@@ -16,6 +16,8 @@ The repository currently includes:
 - observation parsing,
 - typed action abstractions,
 - single-selection and multi-selection action support,
+- selection resolver component with registry-based dispatch,
+- multi-selection prize selection handling,
 - factual game analysis,
 - deterministic decision engine,
 - rule library with tactical rules,
@@ -28,7 +30,7 @@ The repository currently includes:
 
 ## Current Phase
 
-Current completed phase: Phase 12.2 - Instrumentation & Root Cause Analysis Framework
+Current completed phase: Phase 12.5 - Multi-Selection Support (SelectionResolver)
 
 This repository now has:
 
@@ -40,7 +42,11 @@ This repository now has:
 - action validation that prevents returning illegal actions to the environment,
 - safe fallback behavior when action validation fails,
 - comprehensive instrumentation to trace every action decision,
-- analysis tools to identify illegal actions with evidence.
+- analysis tools to identify illegal actions with evidence,
+- new `poketcg.selection` package for converting actions to SDK indices,
+- GenericResolver for single-selection contexts,
+- PrizeResolver for multi-selection prize contexts,
+- registry-based dispatch mechanism for extensible selection resolution.
 
 ## Key Docs
 

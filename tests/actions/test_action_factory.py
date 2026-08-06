@@ -44,6 +44,173 @@ class ActionFactoryTestCase(unittest.TestCase):
         self.factory = ActionFactory()
         self.parser = ObservationParser(self.card_database)
 
+    def test_single_selection_generates_one_action_per_option(self) -> None:
+        """ActionFactory generates one action per option for minCount=1."""
+        from poketcg.domain import (
+            OptionReference,
+            OptionType,
+            SelectContext,
+            SelectPrompt,
+            SelectType,
+            EffectContext,
+        )
+
+        # Create a selection with minCount=1
+        selection = SelectPrompt(
+            selection_type=SelectType.MAIN,
+            context=SelectContext.MAIN,
+            min_count=1,
+            max_count=1,
+            options=(
+                OptionReference(option_type=OptionType.END),
+                OptionReference(option_type=OptionType.END),
+                OptionReference(option_type=OptionType.END),
+            ),
+            effect_context=EffectContext(),
+        )
+        actions = self.factory.from_selection(selection)
+        # Should have 3 actions (one per option)
+        self.assertEqual(len(actions), 3)
+        # Each should have single index
+        for i, action in enumerate(actions):
+            self.assertEqual(action.selected_indices, (i,))
+            self.assertEqual(action.action_index, i)
+
+    def test_combination_generation_mincount_2_3_options(self) -> None:
+        """ActionFactory generates all combinations for minCount=2, 3 options."""
+        from poketcg.domain import (
+            OptionReference,
+            OptionType,
+            SelectContext,
+            SelectPrompt,
+            SelectType,
+            EffectContext,
+        )
+
+        # Create selection with minCount=2, 3 options (no real cards needed)
+        selection = SelectPrompt(
+            selection_type=SelectType.MAIN,
+            context=SelectContext.TO_HAND,
+            min_count=2,
+            max_count=2,
+            options=(
+                OptionReference(option_type=OptionType.CARD),
+                OptionReference(option_type=OptionType.CARD),
+                OptionReference(option_type=OptionType.CARD),
+            ),
+            effect_context=EffectContext(),
+        )
+        actions = self.factory.from_selection(selection)
+        
+        # Should have C(3,2) = 3 combinations
+        self.assertEqual(len(actions), 3)
+        
+        # Verify all combinations exist
+        combinations = {action.selected_indices for action in actions}
+        expected = {(0, 1), (0, 2), (1, 2)}
+        self.assertEqual(combinations, expected)
+        
+        # Verify each is a CardChoiceAction
+        from poketcg.actions.models import CardChoiceAction
+        for action in actions:
+            self.assertIsInstance(action, CardChoiceAction)
+
+    def test_combination_generation_mincount_3_4_options(self) -> None:
+        """ActionFactory generates all combinations for minCount=3, 4 options."""
+        from poketcg.domain import (
+            OptionReference,
+            OptionType,
+            SelectContext,
+            SelectPrompt,
+            SelectType,
+            EffectContext,
+        )
+
+        # Create selection with minCount=3, 4 options
+        selection = SelectPrompt(
+            selection_type=SelectType.MAIN,
+            context=SelectContext.TO_HAND,
+            min_count=3,
+            max_count=3,
+            options=tuple(
+                OptionReference(option_type=OptionType.CARD) for _ in range(4)
+            ),
+            effect_context=EffectContext(),
+        )
+        actions = self.factory.from_selection(selection)
+        
+        # Should have C(4,3) = 4 combinations
+        self.assertEqual(len(actions), 4)
+        
+        # Verify all combinations
+        combinations = {action.selected_indices for action in actions}
+        expected = {(0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3)}
+        self.assertEqual(combinations, expected)
+
+    def test_combination_action_action_index_returns_first(self) -> None:
+        """Combination actions' action_index returns first index for tie-breaking."""
+        from poketcg.domain import (
+            OptionReference,
+            OptionType,
+            SelectContext,
+            SelectPrompt,
+            SelectType,
+            EffectContext,
+        )
+
+        selection = SelectPrompt(
+            selection_type=SelectType.MAIN,
+            context=SelectContext.TO_HAND,
+            min_count=2,
+            max_count=2,
+            options=tuple(
+                OptionReference(option_type=OptionType.CARD) for _ in range(3)
+            ),
+            effect_context=EffectContext(),
+        )
+        actions = self.factory.from_selection(selection)
+        
+        # Find action with indices (1, 2)
+        action_1_2 = next(a for a in actions if a.selected_indices == (1, 2))
+        # action_index should return first index (1)
+        self.assertEqual(action_1_2.action_index, 1)
+
+    def test_combination_action_option_is_first_option(self) -> None:
+        """Combination actions' option is from first selected option."""
+        from poketcg.domain import (
+            OptionReference,
+            OptionType,
+            SelectContext,
+            SelectPrompt,
+            SelectType,
+            EffectContext,
+        )
+
+        options = tuple(
+            OptionReference(option_type=OptionType.CARD, metadata={f"id": i})
+            for i in range(3)
+        )
+
+        selection = SelectPrompt(
+            selection_type=SelectType.MAIN,
+            context=SelectContext.TO_HAND,
+            min_count=2,
+            max_count=2,
+            options=options,
+            effect_context=EffectContext(),
+        )
+        actions = self.factory.from_selection(selection)
+        
+        # Find action with indices (1, 2)
+        action_1_2 = next(a for a in actions if a.selected_indices == (1, 2))
+        # option should be from first selected option (index 1)
+        self.assertEqual(action_1_2.option, options[1])
+        
+        # Find action with indices (0, 2)
+        action_0_2 = next(a for a in actions if a.selected_indices == (0, 2))
+        # option should be from first selected option (index 0)
+        self.assertEqual(action_0_2.option, options[0])
+
     def test_from_observation_builds_batch(self) -> None:
         observation = self._build_observation()
         batch = self.factory.from_observation(observation)

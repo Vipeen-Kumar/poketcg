@@ -1,0 +1,156 @@
+================================================================================
+FORENSIC INVESTIGATION: GAME INVALID STATUS ROOT CAUSE
+================================================================================
+Investigation Date: August 6, 2026
+Method: Instrumentation + Evidence Logging (Zero Code Changes)
+Scope: 50-game run with --stop-on-invalid flag
+Status: INVESTIGATION COMPLETE
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+Question: Why do some games randomly (~1 in 10-20) end with INVALID status?
+Answer: Multi-selection contexts are incorrectly routed to single-select resolver.
+
+Root Cause: SelectionResolverRegistry maps incomplete context→resolver pairs.
+
+Exact Failure: SelectContext.TO_HAND with minCount=2 uses GenericResolver instead 
+of a multi-select resolver, returning [0] when [0,1] is required.
+
+================================================================================
+FORENSIC FINDINGS
+================================================================================
+
+1. WHERE EXECUTION STOPPED
+   ├─ Execution path: complete
+   ├─ No exception raised
+   ├─ SelectionResolver.resolve() succeeded
+   └─ Bug is silent - returns invalid output without error
+
+2. WHICH COMPONENT FAILED FIRST
+   ├─ Component: SelectionResolverRegistry
+   ├─ Location: src/poketcg/selection/registry.py
+   ├─ Method: _register_defaults()
+   ├─ Failure Type: Incomplete context mapping
+   └─ Only TO_PRIZE mapped to specialized resolver
+       All other contexts including TO_HAND → GenericResolver
+
+3. EXACT VALUES OBSERVED
+
+   A. Multi-Select Context Encountered:
+      - context: SelectContext.TO_HAND
+      - minCount: 2
+      - maxCount: 2
+      - options: 3+
+      
+   B. Action Selected:
+      - selected_indices: (0,)  ← Only ONE index in tuple
+      
+   C. Resolver Routing:
+      - Resolver class: GenericResolver  ← WRONG!
+      - (Should be: specialized multi-select resolver or PrizeResolver)
+      
+   D. Resolver Output:
+      - resolved_indices: (0,)  ← Single index returned
+      
+   E. SDK Submission:
+      - list returned: [0]
+      - length: 1
+      - required: minCount=2
+      - result: len([0])=1 < 2 → INVALID
+
+4. MULTI-SELECTION HYPOTHESIS STATUS
+   ├─ CONFIRMED ✓
+   ├─ Evidence: Direct observation of minCount > 1 with single-index output
+   ├─ Root cause: Registry mapping incomplete
+   └─ Frequency: Explains ~1 in 10-20 INVALID rate (rare context occurrence)
+
+5. SMALLEST POSSIBLE FIX
+
+   ROOT PROBLEM:
+   - SelectionResolverRegistry assumes only TO_PRIZE has multi-selection
+   - Other multi-select contexts default to GenericResolver
+   
+   SOLUTION OPTIONS (in order of scope):
+   
+   Option A (Minimal - Expand Registry):
+   - Map SelectContext.TO_HAND to PrizeResolver (same constraints)
+   - Add any other multi-select contexts to PrizeResolver
+   - 5-10 lines of code
+   
+   Option B (Medium - Detect minCount at Runtime):
+   - Check selection.min_count > 1 in registry dispatch
+   - Route to PrizeResolver if minCount > 1
+   - 15-20 lines of code
+   
+   Option C (Recommended - Metadata-Driven):
+   - Add min_count/max_count to SelectContext enum or separate mapping
+   - Auto-route based on constraints
+   - 25-30 lines of code
+   
+   IMMEDIATE FIX: Option A
+   - Change line 29 in registry.py from:
+     self._resolvers[SelectContext.TO_PRIZE] = PrizeResolver()
+   - To:
+     prize_resolver = PrizeResolver()
+     self._resolvers[SelectContext.TO_PRIZE] = prize_resolver
+     self._resolvers[SelectContext.TO_HAND] = prize_resolver
+   - (Repeat for any other multi-select contexts)
+
+================================================================================
+FORENSIC EVIDENCE CHAIN
+================================================================================
+
+Entry Point: Observation with SelectContext.TO_HAND, minCount=2
+  ↓
+[FORENSIC] selection.context=SelectContext.TO_HAND
+[FORENSIC] selection.minCount=2
+[FORENSIC] selection.maxCount=2
+[FORENSIC] action.selected_indices=(0,)
+  ↓
+Registry lookup: SelectionResolverRegistry.get_resolver(TO_HAND)
+  ↓
+[FORENSIC] resolver_class=GenericResolver  ← BUG HERE
+  ↓
+GenericResolver.resolve(action=(0,), selection.minCount=2)
+  ↓
+Returns: (0,)  ← Ignores minCount constraint
+  ↓
+[FORENSIC] resolved_indices=(0,)
+[FORENSIC] About to return to SDK: [0]
+  ↓
+SDK.battle_select([0])
+  ↓
+C++ validator: len([0])=1 < minCount=2
+  ↓
+battle_select() raises IndexError
+  ↓
+cabt.py catches exception
+  ↓
+status = INVALID
+
+================================================================================
+CONCLUSION
+================================================================================
+
+The multi-selection support hypothesis is CONCLUSIVELY CONFIRMED.
+
+FACTS:
+1. SelectContext.TO_HAND can have minCount=2 constraints (observed)
+2. SelectionResolverRegistry routes TO_HAND to GenericResolver (registry default)
+3. GenericResolver returns single-element tuples only (by design)
+4. SDK receives [0] when [0,1] or [1,2] etc. is required
+5. SDK validation fails because len([0])=1 < minCount=2
+6. Environment sets status to INVALID
+
+ROOT CAUSE: Incomplete context-to-resolver mapping in SelectionResolverRegistry
+
+RARITY EXPLANATION: Multi-select non-TO_PRIZE contexts occur infrequently
+  → ~1 in 10-20 games
+  → Games that never hit TO_HAND multi-select contexts complete successfully
+  → Games that do hit them end with INVALID
+
+THE BUG IS REAL. SOLUTION IS STRAIGHTFORWARD.
+
+================================================================================

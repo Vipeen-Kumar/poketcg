@@ -157,6 +157,10 @@ class DecisionEngine:
                         f"Action index: {getattr(result.selected_action, 'action_index', 'N/A')}, "
                         f"Legal actions count: {len(context.legal_actions)}"
                     )
+                import sys
+                action = result.selected_action
+                print(f"[TRACE-ENGINE] Rule {rule.name} selected action", file=sys.stderr)
+                print(f"[TRACE-ENGINE] selected_indices={action.selected_indices} id={id(action)}", file=sys.stderr)
                 return self._finalize_outcome(
                     context=context,
                     evaluated_results=evaluated_results,

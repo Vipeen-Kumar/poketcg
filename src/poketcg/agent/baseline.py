@@ -16,6 +16,7 @@ from poketcg.debug import DecisionMetadata, ReplayLogger
 from poketcg.domain import ActionSelection, CardType, Deck, Observation, PokemonType, Stage
 from poketcg.engine import ObservationParser
 from poketcg.rules import FallbackRule
+from poketcg.selection import SelectionResolver
 
 from .config import BaselineAgentConfig
 from .interfaces import BaseAgent
@@ -51,6 +52,7 @@ class BaselineAgent(BaseAgent):
         self._action_factory = action_factory
         self._decision_engine = decision_engine
         self._replay_logger = replay_logger
+        self._selection_resolver = SelectionResolver()
         self._fallback_rule = FallbackRule()
         self._deck_validator = DeckValidator(card_database)
         self._game_counter = 0
@@ -83,19 +85,73 @@ class BaselineAgent(BaseAgent):
         # Validate that the selected action is legal before returning
         validated_action = self._validate_action_legality(selected_action, artifacts)
         
+        # === FORENSIC INSTRUMENTATION - QUESTION 1 & 6 ===
+        import sys
+        print(f"[TRACE-BASELINE] act() received validated_action", file=sys.stderr)
+        print(f"[TRACE-BASELINE] validated_action id={id(validated_action)}", file=sys.stderr)
+        print(f"[TRACE-BASELINE] validated_action.selected_indices={validated_action.selected_indices}", file=sys.stderr)
+        print(f"[FORENSIC] SelectionResolver.resolve() about to execute", file=sys.stderr)
+        print(f"[FORENSIC] selection.context={observation.selection.context}", file=sys.stderr)
+        print(f"[FORENSIC] selection.minCount={observation.selection.min_count}", file=sys.stderr)
+        print(f"[FORENSIC] selection.maxCount={observation.selection.max_count}", file=sys.stderr)
+        print(f"[FORENSIC] action.selected_indices={validated_action.selected_indices}", file=sys.stderr)
+        print(f"[FORENSIC] resolver_class={type(self._selection_resolver._registry.get_resolver(observation.selection.context)).__name__}", file=sys.stderr)
+        
+        # Resolve the action into the final indices using SelectionResolver
+        try:
+            resolved_indices = self._selection_resolver.resolve(
+                validated_action,
+                observation.selection
+            )
+            print(f"[TRACE-BASELINE] After resolver.resolve() returned", file=sys.stderr)
+            print(f"[TRACE-BASELINE] resolved_indices={resolved_indices}", file=sys.stderr)
+            print(f"[FORENSIC] SelectionResolver.resolve() succeeded", file=sys.stderr)
+            print(f"[FORENSIC] resolved_indices={resolved_indices}", file=sys.stderr)
+        except Exception as resolver_error:
+            print(f"[FORENSIC] SelectionResolver.resolve() raised exception", file=sys.stderr)
+            print(f"[FORENSIC] exception_type={type(resolver_error).__name__}", file=sys.stderr)
+            print(f"[FORENSIC] exception_message={str(resolver_error)}", file=sys.stderr)
+            raise
+        
         # Trace the decision for debugging (use first index for backward compatibility)
         returned_index = validated_action.selected_indices[0] if validated_action.selected_indices else -1
         self._trace_action_decision(observation, artifacts.context.legal_actions, validated_action, returned_index)
         
         self._finish_replay_if_terminal(observation)
-        # Return all selected indices for multi-selection support
-        return ActionSelection(selected_option_indices=validated_action.selected_indices)
+        # Return the resolved indices from SelectionResolver
+        print(f"[FORENSIC] About to return to SDK: {list(resolved_indices)}", file=sys.stderr)
+        return ActionSelection(selected_option_indices=resolved_indices)
 
     def handle_observation(self, raw_observation: RawObservation | Observation) -> SubmissionResponse:
         """Handle a raw Kaggle observation or parsed observation end to end."""
 
-        # Debug logging
+        # === FORENSIC: Capture all select observations with full details ===
         import sys
+        import json
+        if isinstance(raw_observation, dict):
+            obs_data = raw_observation.get("observation") or raw_observation
+            if isinstance(obs_data, dict) and "select" in obs_data:
+                select_data = obs_data["select"]
+                if isinstance(select_data, dict):
+                    context_val = select_data.get("context")
+                    min_count = select_data.get("minCount")
+                    max_count = select_data.get("maxCount")
+                    
+                    # TO_HAND is context 7
+                    if context_val == 7 and min_count is not None and max_count is not None:
+                        options = select_data.get("option", [])
+                        print(f"\n{'='*100}", file=sys.stderr)
+                        print(f"[CAPTURE-SEMANTIC] SelectContext.TO_HAND OBSERVATION", file=sys.stderr)
+                        print(f"[CAPTURE-SEMANTIC] minCount={min_count}, maxCount={max_count}", file=sys.stderr)
+                        print(f"[CAPTURE-SEMANTIC] Number of options: {len(options)}", file=sys.stderr)
+                        print(f"[CAPTURE-SEMANTIC] Options (first 3000 chars of JSON):", file=sys.stderr)
+                        opt_json = json.dumps(options, indent=2, default=str)
+                        print(opt_json[:3000], file=sys.stderr)
+                        if len(opt_json) > 3000:
+                            print(f"[CAPTURE-SEMANTIC] ... (total {len(opt_json)} chars)", file=sys.stderr)
+                        print(f"{'='*100}\n", file=sys.stderr)
+
+        # Debug logging
         print(f"[DEBUG] Raw observation keys: {list(raw_observation.keys()) if isinstance(raw_observation, dict) else 'not dict'}", file=sys.stderr)
         if isinstance(raw_observation, dict):
             print(f"[DEBUG] current value: {raw_observation.get('current')}", file=sys.stderr)
@@ -112,11 +168,18 @@ class BaselineAgent(BaseAgent):
         print("[DEBUG] Detected as regular observation", file=sys.stderr)
         try:
             parsed = raw_observation if isinstance(raw_observation, Observation) else self._observation_parser.parse(raw_observation)
-            return AgentLifecycle.serialize_action_selection(self.act(parsed))
+            action_selection = self.act(parsed)
+            final_list = list(action_selection.selected_option_indices)
+            print(f"[FORENSIC] act() succeeded, returning to SDK: {final_list}", file=sys.stderr)
+            return AgentLifecycle.serialize_action_selection(action_selection)
         except Exception as error:
+            print(f"[FORENSIC] Exception in act(): {type(error).__name__}: {str(error)}", file=sys.stderr)
             if isinstance(raw_observation, Mapping) and self._config.safe_raw_fallback:
+                print(f"[FORENSIC] EMERGENCY FALLBACK ENTERED", file=sys.stderr)
                 fallback = AgentLifecycle.emergency_first_legal_action(raw_observation)
+                print(f"[FORENSIC] Emergency fallback returned: {fallback}", file=sys.stderr)
                 if fallback is not None:
+                    print(f"[FORENSIC] Returning emergency fallback to SDK: {fallback}", file=sys.stderr)
                     return fallback
             raise RuntimeError("BaselineAgent failed to produce a submission response.") from error
 
@@ -149,10 +212,15 @@ class BaselineAgent(BaseAgent):
         """Validate that the selected action is legal before returning to environment.
         
         If validation fails, returns the first legal action as a safe fallback.
-        Performs three-layer validation:
+        Performs two-layer validation:
         1. Null check - action exists
-        2. Bounds check - action_index is within legal range
-        3. Identity check - action object is in the legal_actions tuple
+        2. Legality check - action object is in the legal_actions tuple (direct identity check)
+        
+        NOTE: This uses direct identity checking rather than action_index lookup because:
+        - For single-select actions: action_index == position in legal_actions
+        - For multi-select combination actions: action_index is the FIRST selected index, 
+          NOT the position in legal_actions
+        By checking if the action is directly in legal_actions, we support both cases.
         """
         # Layer 1: Null check
         if selected_action is None:
@@ -161,38 +229,19 @@ class BaselineAgent(BaseAgent):
                 return artifacts.context.legal_actions[0]
             raise RuntimeError("No legal actions available for validation fallback.")
         
-        # Layer 2: Bounds check on action_index
-        if not hasattr(selected_action, 'action_index'):
-            # Malformed action - use first legal action
-            if artifacts.context.legal_actions:
-                return artifacts.context.legal_actions[0]
-            raise RuntimeError("Selected action has no action_index attribute.")
+        # Layer 2: Legality check - verify action is in the legal_actions tuple
+        # Use direct identity check to support both single-select and multi-select actions
+        # This bypasses the broken assumption that action_index equals array position
+        if selected_action in artifacts.context.legal_actions:
+            # Action is valid - it's one of the legal choices
+            return selected_action
         
-        action_index = selected_action.action_index
+        # Action is not in legal_actions - use first legal action as fallback
+        # This shouldn't happen if DecisionEngine worked correctly
+        if artifacts.context.legal_actions:
+            return artifacts.context.legal_actions[0]
         
-        if action_index < 0 or action_index >= len(artifacts.context.legal_actions):
-            # Invalid index - use first legal action
-            if artifacts.context.legal_actions:
-                return artifacts.context.legal_actions[0]
-            raise RuntimeError(f"Action index {action_index} out of range [0, {len(artifacts.context.legal_actions) - 1}].")
-        
-        # Layer 3: Identity check - verify action is actually in the tuple
-        # This is a critical check because DecisionEngine already performs this, but we verify again
-        legal_action_at_index = artifacts.context.legal_actions[action_index]
-        
-        # First check: object identity (they should be the exact same object)
-        if selected_action is not legal_action_at_index:
-            # If object identity fails, try equality check in case action was copied
-            if not (hasattr(selected_action, 'action_index') and 
-                   selected_action.action_index == legal_action_at_index.action_index and
-                   type(selected_action) == type(legal_action_at_index)):
-                # Action object mismatch - use first legal action (shouldn't happen if DecisionEngine worked correctly)
-                if artifacts.context.legal_actions:
-                    return artifacts.context.legal_actions[0]
-                raise RuntimeError("Selected action object not found in legal actions after identity check.")
-        
-        # Action is valid
-        return selected_action
+        raise RuntimeError("Selected action not found in legal actions and no fallback available.")
 
     def _safe_fallback_outcome(self, artifacts: BaselineDecisionArtifacts, error: Exception) -> DecisionOutcome:
         try:
