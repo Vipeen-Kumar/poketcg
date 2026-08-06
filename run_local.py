@@ -162,6 +162,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
         default="result.html",
         help="HTML replay output path for a single game, or filename prefix for multiple games.",
     )
+    parser.add_argument(
+        "--stop-on-invalid",
+        action="store_true",
+        help="Stop immediately and exit with non-zero code if a game ends with INVALID status.",
+    )
     return parser
 
 
@@ -236,7 +241,7 @@ def _html_output_path(base_path: Path, game_number: int, total_games: int) -> Pa
     return base_path.with_name(f"{stem}_{game_number:03d}{suffix}")
 
 
-def run_local_games(*, games: int, replay: bool, seed: int | None, html_path: str) -> int:
+def run_local_games(*, games: int, replay: bool, seed: int | None, html_path: str, stop_on_invalid: bool) -> int:
     """Run one or more local official cabt matches."""
 
     if games < 1:
@@ -298,6 +303,28 @@ def run_local_games(*, games: int, replay: bool, seed: int | None, html_path: st
         print(f"[Game {game_number}/{games}] Statuses: {statuses} | Rewards: {rewards}")
         print(f"[Game {game_number}/{games}] HTML replay written to {output_path}.")
 
+        # Check for INVALID status if --stop-on-invalid is enabled
+        if stop_on_invalid and any(status == "INVALID" for status in statuses):
+            print()
+            print("=" * 80)
+            print("INVALID DETECTED")
+            print("=" * 80)
+            print(f"Game: {game_number}")
+            print(f"Statuses: {statuses}")
+            print(f"Rewards: {rewards}")
+            if replay:
+                print()
+                print("Replay files generated in: outputs/replays/")
+                agent0_agent = agent0._agent
+                if hasattr(agent0_agent, '_replay_logger') and agent0_agent._replay_logger.session:
+                    session = agent0_agent._replay_logger.session
+                    replay_dir = agent0_agent._replay_logger._config.output_directory
+                    if replay_dir:
+                        print(f"Game ID: {session.game_id}")
+            print(f"HTML replay: {output_path}")
+            print("=" * 80)
+            return 1
+
     if replay:
         print("Replay logs written to outputs/replays/.")
     return 0
@@ -308,7 +335,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     parser = build_argument_parser()
     args = parser.parse_args(argv)
-    return run_local_games(games=args.games, replay=args.replay, seed=args.seed, html_path=args.html)
+    return run_local_games(games=args.games, replay=args.replay, seed=args.seed, html_path=args.html, stop_on_invalid=args.stop_on_invalid)
 
 
 if __name__ == "__main__":

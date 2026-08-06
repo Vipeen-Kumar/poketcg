@@ -475,7 +475,7 @@ class RuleLibraryTestCase(unittest.TestCase):
 
     def _make_attack_action(self, pokemon: Pokemon, attack) -> AttackAction:
         return AttackAction(
-            action_index=0,
+            selected_indices=(0,),
             kind=ActionKind.ATTACK,
             option=OptionReference(option_type=OptionType.ATTACK, attack_id=0),
             selection_context=SelectContext.MAIN,
@@ -490,7 +490,7 @@ class RuleLibraryTestCase(unittest.TestCase):
 
     def _make_attach_energy_action(self, target: Pokemon, card_data: CardData) -> AttachEnergyAction:
         return AttachEnergyAction(
-            action_index=0,
+            selected_indices=(0,),
             kind=ActionKind.ATTACH_ENERGY,
             option=OptionReference(option_type=OptionType.ATTACH, card=Card(metadata=card_data)),
             selection_context=SelectContext.MAIN,
@@ -506,7 +506,7 @@ class RuleLibraryTestCase(unittest.TestCase):
 
     def _make_retreat_action(self, target: Pokemon) -> RetreatAction:
         return RetreatAction(
-            action_index=0,
+            selected_indices=(0,),
             kind=ActionKind.RETREAT,
             option=OptionReference(option_type=OptionType.RETREAT),
             selection_context=SelectContext.MAIN,
@@ -520,7 +520,7 @@ class RuleLibraryTestCase(unittest.TestCase):
     def _make_evolution_action(self, target: Pokemon, card_data: CardData) -> EvolutionAction:
         card = Card(metadata=card_data)
         return EvolutionAction(
-            action_index=0,
+            selected_indices=(0,),
             kind=ActionKind.EVOLVE,
             option=OptionReference(option_type=OptionType.EVOLVE, card=card),
             selection_context=SelectContext.MAIN,
@@ -536,7 +536,7 @@ class RuleLibraryTestCase(unittest.TestCase):
         card = Card(metadata=card_data)
         option_type = OptionType.PLAY
         return PlayCardAction(
-            action_index=0,
+            selected_indices=(0,),
             kind=ActionKind.PLAY_CARD,
             option=OptionReference(option_type=option_type, card=card),
             selection_context=SelectContext.MAIN,
@@ -548,7 +548,7 @@ class RuleLibraryTestCase(unittest.TestCase):
 
     def _make_ability_action(self, source: Pokemon, ability) -> AbilityAction:
         return AbilityAction(
-            action_index=0,
+            selected_indices=(0,),
             kind=ActionKind.USE_ABILITY,
             option=OptionReference(option_type=OptionType.SKILL),
             selection_context=SelectContext.MAIN,
@@ -560,7 +560,7 @@ class RuleLibraryTestCase(unittest.TestCase):
 
     def _make_end_turn_action(self) -> EndTurnAction:
         return EndTurnAction(
-            action_index=0,
+            selected_indices=(0,),
             kind=ActionKind.END_TURN,
             option=OptionReference(option_type=OptionType.END),
             selection_context=SelectContext.MAIN,

@@ -15,6 +15,7 @@ The repository currently includes:
 - English card database,
 - observation parsing,
 - typed action abstractions,
+- single-selection and multi-selection action support,
 - factual game analysis,
 - deterministic decision engine,
 - rule library with tactical rules,
@@ -147,6 +148,36 @@ python run_local.py --games 10
 python run_local.py --games 3 --seed 42
 python run_local.py --games 3 --replay
 python run_local.py --games 1 --html result.html
+python run_local.py --games 100 --stop-on-invalid
+```
+
+### Stopping on Invalid Status
+
+Use `--stop-on-invalid` to stop immediately if any game ends with `INVALID` status:
+
+```powershell
+python run_local.py --games 100 --stop-on-invalid
+```
+
+When `INVALID` is detected:
+- Clear message printed with game number, statuses, and rewards
+- Replay files preserved (if `--replay` was enabled)
+- HTML replay location printed
+- Execution stops (returns non-zero exit code)
+
+Example output:
+
+```
+[Game 7/100] Statuses: ['INVALID', 'DONE'] | Rewards: [0, 1]
+
+================================================================================
+INVALID DETECTED
+================================================================================
+Game: 7
+Statuses: ['INVALID', 'DONE']
+Rewards: [0, 1]
+HTML replay: result_007.html
+================================================================================
 ```
 
 If `kaggle-environments` is missing, the runner prints a helpful install message instead of raising a confusing traceback.

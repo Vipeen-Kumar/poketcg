@@ -54,6 +54,9 @@ class ActionFactory:
 
         attack_metadata_queue = self._attack_metadata_queue(selection, state)
         actions: list[BaseAction] = []
+        
+        # For now, only support single-selection (existing behavior)
+        # Multi-selection support can be added in future if needed
         for option_index, option in enumerate(selection.options):
             attack_metadata = attack_metadata_queue.pop(0) if option.option_type is OptionType.ATTACK and attack_metadata_queue else None
             actions.append(self._build_action(option_index, selection, option, state=state, attack_metadata=attack_metadata))
@@ -69,7 +72,7 @@ class ActionFactory:
         attack_metadata: AttackData | None,
     ) -> BaseAction:
         base_kwargs = {
-            "action_index": option_index,
+            "selected_indices": (option_index,),
             "option": option,
             "selection_context": selection.context,
             "selection_type": selection.selection_type,

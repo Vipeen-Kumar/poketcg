@@ -215,7 +215,7 @@ class DecisionEngineTestCase(unittest.TestCase):
     def _make_action(self) -> BaseAction:
         option = OptionReference(option_type=OptionType.END)
         return EndTurnAction(
-            action_index=0,
+            selected_indices=(0,),
             kind=ActionKind.END_TURN,
             option=option,
             selection_context=SelectContext.MAIN,

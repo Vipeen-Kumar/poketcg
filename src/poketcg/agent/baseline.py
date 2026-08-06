@@ -83,12 +83,13 @@ class BaselineAgent(BaseAgent):
         # Validate that the selected action is legal before returning
         validated_action = self._validate_action_legality(selected_action, artifacts)
         
-        # Trace the decision for debugging
-        returned_index = validated_action.action_index
+        # Trace the decision for debugging (use first index for backward compatibility)
+        returned_index = validated_action.selected_indices[0] if validated_action.selected_indices else -1
         self._trace_action_decision(observation, artifacts.context.legal_actions, validated_action, returned_index)
         
         self._finish_replay_if_terminal(observation)
-        return ActionSelection(selected_option_indices=(returned_index,))
+        # Return all selected indices for multi-selection support
+        return ActionSelection(selected_option_indices=validated_action.selected_indices)
 
     def handle_observation(self, raw_observation: RawObservation | Observation) -> SubmissionResponse:
         """Handle a raw Kaggle observation or parsed observation end to end."""

@@ -13,12 +13,17 @@ from .enums import ActionKind
 
 @dataclass(slots=True, kw_only=True)
 class BaseAction:
-    action_index: int
+    selected_indices: tuple[int, ...]
     kind: ActionKind
     option: OptionReference
     selection_context: SelectContext
     selection_type: SelectType
     metadata: dict[str, object] = field(default_factory=dict)
+    
+    @property
+    def action_index(self) -> int:
+        """Backward compatibility property. Returns first selected index."""
+        return self.selected_indices[0] if self.selected_indices else -1
 
 
 @dataclass(slots=True, kw_only=True)

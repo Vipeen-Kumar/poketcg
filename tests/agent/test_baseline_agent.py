@@ -126,7 +126,7 @@ class BaselineAgentTestCase(unittest.TestCase):
         from poketcg.domain import SelectContext, SelectType, OptionReference, OptionType
 
         invalid_action = EndTurnAction(
-            action_index=999,  # Out of range
+            selected_indices=(999,),  # Out of range
             kind=ActionKind.END_TURN,
             option=OptionReference(option_type=OptionType.END),
             selection_context=SelectContext.MAIN,
