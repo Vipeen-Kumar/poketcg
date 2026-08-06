@@ -79,8 +79,16 @@ class BaselineAgent(BaseAgent):
         self._ensure_game_started()
         artifacts = self._build_decision_artifacts(observation)
         selected_action = self._choose_action(artifacts)
+        
+        # Validate that the selected action is legal before returning
+        validated_action = self._validate_action_legality(selected_action, artifacts)
+        
+        # Trace the decision for debugging
+        returned_index = validated_action.action_index
+        self._trace_action_decision(observation, artifacts.context.legal_actions, validated_action, returned_index)
+        
         self._finish_replay_if_terminal(observation)
-        return ActionSelection(selected_option_indices=(selected_action.action_index,))
+        return ActionSelection(selected_option_indices=(returned_index,))
 
     def handle_observation(self, raw_observation: RawObservation | Observation) -> SubmissionResponse:
         """Handle a raw Kaggle observation or parsed observation end to end."""
@@ -135,6 +143,55 @@ class BaselineAgent(BaseAgent):
         except Exception as error:
             fallback_outcome = self._safe_fallback_outcome(artifacts, error)
             return fallback_outcome.action
+
+    def _validate_action_legality(self, selected_action: BaseAction, artifacts: BaselineDecisionArtifacts) -> BaseAction:
+        """Validate that the selected action is legal before returning to environment.
+        
+        If validation fails, returns the first legal action as a safe fallback.
+        Performs three-layer validation:
+        1. Null check - action exists
+        2. Bounds check - action_index is within legal range
+        3. Identity check - action object is in the legal_actions tuple
+        """
+        # Layer 1: Null check
+        if selected_action is None:
+            # Action is None - use first legal action
+            if artifacts.context.legal_actions:
+                return artifacts.context.legal_actions[0]
+            raise RuntimeError("No legal actions available for validation fallback.")
+        
+        # Layer 2: Bounds check on action_index
+        if not hasattr(selected_action, 'action_index'):
+            # Malformed action - use first legal action
+            if artifacts.context.legal_actions:
+                return artifacts.context.legal_actions[0]
+            raise RuntimeError("Selected action has no action_index attribute.")
+        
+        action_index = selected_action.action_index
+        
+        if action_index < 0 or action_index >= len(artifacts.context.legal_actions):
+            # Invalid index - use first legal action
+            if artifacts.context.legal_actions:
+                return artifacts.context.legal_actions[0]
+            raise RuntimeError(f"Action index {action_index} out of range [0, {len(artifacts.context.legal_actions) - 1}].")
+        
+        # Layer 3: Identity check - verify action is actually in the tuple
+        # This is a critical check because DecisionEngine already performs this, but we verify again
+        legal_action_at_index = artifacts.context.legal_actions[action_index]
+        
+        # First check: object identity (they should be the exact same object)
+        if selected_action is not legal_action_at_index:
+            # If object identity fails, try equality check in case action was copied
+            if not (hasattr(selected_action, 'action_index') and 
+                   selected_action.action_index == legal_action_at_index.action_index and
+                   type(selected_action) == type(legal_action_at_index)):
+                # Action object mismatch - use first legal action (shouldn't happen if DecisionEngine worked correctly)
+                if artifacts.context.legal_actions:
+                    return artifacts.context.legal_actions[0]
+                raise RuntimeError("Selected action object not found in legal actions after identity check.")
+        
+        # Action is valid
+        return selected_action
 
     def _safe_fallback_outcome(self, artifacts: BaselineDecisionArtifacts, error: Exception) -> DecisionOutcome:
         try:
@@ -210,15 +267,75 @@ class BaselineAgent(BaseAgent):
             return
         self._game_counter += 1
         game_id = f"{self._config.game_id_prefix}_{self._game_counter:03d}"
+        
+        # Reset trace collector for new game
+        from poketcg.debug.action_trace import reset_trace_collector
+        reset_trace_collector()
+        
         self._replay_logger.start_game(
             game_id,
             metadata={"deck_name": self._deck.name, "deck_size": len(self._deck.card_ids)},
         )
 
+    def _trace_action_decision(
+        self,
+        observation: Observation,
+        legal_actions: tuple[BaseAction, ...],
+        chosen_action: BaseAction | None,
+        returned_index: int,
+    ) -> None:
+        """Trace the action decision for debugging purposes."""
+        from poketcg.debug.action_trace import get_trace_collector
+
+        trace_collector = get_trace_collector()
+        
+        # Determine validation status
+        validation_passed = True
+        validation_error = None
+        
+        if returned_index is not None and observation.selection is not None:
+            legal_option_count = len(observation.selection.options) if observation.selection.options else 0
+            if returned_index < 0 or returned_index >= legal_option_count:
+                validation_passed = False
+                validation_error = f"Index {returned_index} out of bounds [0, {legal_option_count - 1}]"
+            elif chosen_action is not None:
+                # Additional check: is the chosen action actually in the legal_actions tuple?
+                if chosen_action not in legal_actions:
+                    validation_passed = False
+                    validation_error = f"Chosen action object not in legal_actions tuple (length={len(legal_actions)})"
+        
+        trace_collector.trace_decision(
+            observation=observation,
+            legal_actions=legal_actions,
+            chosen_action=chosen_action,
+            returned_integer=returned_index,
+            validation_passed=validation_passed,
+            validation_error=validation_error,
+            decision_error=None,
+        )
+
     def _finish_replay_if_terminal(self, observation: Observation) -> None:
         if not self._replay_logger.enabled or not observation.is_terminal:
             return
+        
+        # Print action trace before finishing replay
+        from poketcg.debug.action_trace import get_trace_collector
+
+        trace_collector = get_trace_collector()
+        trace_output = trace_collector.log_turn_summary()
+        print(trace_output)
+
+        # Export trace as JSON if replay is enabled
         session = self._replay_logger.session
+        if session is not None:
+            import json
+            from pathlib import Path
+
+            trace_json_path = Path("outputs/replays") / f"trace_{session.game_id}.json"
+            trace_json_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(trace_json_path, "w") as f:
+                f.write(trace_collector.to_json())
+
         if session is None or session.status != "in_progress":
             return
         result = None if observation.result is None else observation.result.name

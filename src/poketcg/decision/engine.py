@@ -97,7 +97,11 @@ class BaseRule:
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
+        # Skip registration for abstract base classes
         if cls is BaseRule or not getattr(cls, "auto_register", True):
+            return
+        # Skip if rule_name is not set (indicates an intermediate base class)
+        if getattr(cls, "rule_name", None) is None and cls.__name__ == "BaseRule":
             return
         get_default_registry().register(cls())
 
@@ -144,6 +148,15 @@ class DecisionEngine:
                 result = rule.evaluate(context)
             evaluated_results.append(result)
             if result.passed:
+                # Validate that the selected action is in the legal actions
+                if result.selected_action is None:
+                    raise InvalidRuleError(f"Rule {rule.name} passed but selected_action is None.")
+                if result.selected_action not in context.legal_actions:
+                    raise InvalidRuleError(
+                        f"Rule {rule.name} returned action not in legal_actions. "
+                        f"Action index: {getattr(result.selected_action, 'action_index', 'N/A')}, "
+                        f"Legal actions count: {len(context.legal_actions)}"
+                    )
                 return self._finalize_outcome(
                     context=context,
                     evaluated_results=evaluated_results,
@@ -155,6 +168,18 @@ class DecisionEngine:
         fallback_rule = working_registry.fallback_rule()
         fallback_result = fallback_rule.evaluate(context)
         evaluated_results.append(fallback_result)
+        
+        # Validate fallback rule result too
+        if fallback_result.passed:
+            if fallback_result.selected_action is None:
+                raise InvalidRuleError("Fallback rule passed but selected_action is None.")
+            if fallback_result.selected_action not in context.legal_actions:
+                raise InvalidRuleError(
+                    f"Fallback rule returned action not in legal_actions. "
+                    f"Action index: {getattr(fallback_result.selected_action, 'action_index', 'N/A')}, "
+                    f"Legal actions count: {len(context.legal_actions)}"
+                )
+        
         if not fallback_result.passed:
             raise MissingFallbackRuleError("The fallback rule failed to select an action.")
 

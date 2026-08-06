@@ -10,18 +10,25 @@ from poketcg.decision.context import DecisionContext
 from poketcg.decision.results import RuleResult
 
 from .base import BaseRule
+from .strategy import supporter_is_beneficial, supporter_score
 
 
 class SupporterRule(BaseRule):
     """Select a legal Supporter play when one is available."""
 
     rule_name = "SupporterRule"
-    description = "Choose the first legal supporter play action."
-    default_priority = 600
+    description = "Choose a beneficial legal supporter play action."
+    default_priority = 800
 
     def applies(self, context: DecisionContext) -> bool:
-        return not context.observation.supporter_played and any(
-            isinstance(action, PlayCardAction) and action.card.metadata.is_supporter() for action in context.analyzer.play_actions()
+        state = context.observation.state
+        if state is None or state.supporter_played:
+            return False
+        return any(
+            isinstance(action, PlayCardAction)
+            and action.card.metadata.is_supporter()
+            and supporter_is_beneficial(action.card)
+            for action in context.analyzer.play_actions()
         )
 
     def evaluate(self, context: DecisionContext) -> RuleResult:
@@ -29,7 +36,7 @@ class SupporterRule(BaseRule):
         actions = tuple(
             action
             for action in context.analyzer.play_actions()
-            if isinstance(action, PlayCardAction) and action.card.metadata.is_supporter()
+            if isinstance(action, PlayCardAction) and action.card.metadata.is_supporter() and supporter_is_beneficial(action.card)
         )
         if not actions:
             return self._result(
@@ -39,10 +46,12 @@ class SupporterRule(BaseRule):
                 metadata={"available_supporter_actions": 0},
                 execution_time=perf_counter() - start,
             )
+        selected = sorted(actions, key=lambda action: (-supporter_score(action.card)[0], -supporter_score(action.card)[1], action.action_index))[0]
+        score = supporter_score(selected.card)
         return self._result(
             passed=True,
-            action=actions[0],
-            reason="Supporter play is available.",
-            metadata={"available_supporter_actions": len(actions)},
+            action=selected,
+            reason=f"Supporter {selected.card.name} looks beneficial.",
+            metadata={"available_supporter_actions": len(actions), "supporter_score": score[0]},
             execution_time=perf_counter() - start,
         )

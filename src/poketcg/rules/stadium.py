@@ -20,9 +20,10 @@ class StadiumRule(BaseRule):
     default_priority = 400
 
     def applies(self, context: DecisionContext) -> bool:
-        return not context.observation.stadium_played and any(
-            isinstance(action, PlayCardAction) and action.card.metadata.is_stadium() for action in context.analyzer.play_actions()
-        )
+        state = context.observation.state
+        if state is None or state.stadium_played:
+            return False
+        return any(isinstance(action, PlayCardAction) and action.card.metadata.is_stadium() for action in context.analyzer.play_actions())
 
     def evaluate(self, context: DecisionContext) -> RuleResult:
         start = perf_counter()

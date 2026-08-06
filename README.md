@@ -6,7 +6,7 @@ This repository is intentionally modular. The final Kaggle submission reduces to
 
 ## Project Status
 
-Status: Baseline agent implemented and aligned with the official Kaggle `cabt` runtime model
+Status: Instrumentation framework implemented for root-cause analysis
 
 The repository currently includes:
 
@@ -17,22 +17,29 @@ The repository currently includes:
 - typed action abstractions,
 - factual game analysis,
 - deterministic decision engine,
-- rule library,
+- rule library with tactical rules,
 - replay/debug logging,
 - deck validation,
+- action validation and safe fallbacks,
+- comprehensive action pipeline instrumentation,
 - baseline agent orchestration,
 - Kaggle-compatible entrypoint and submission packaging.
 
 ## Current Phase
 
-Current completed phase: Phase 11 - Deck Validation Subsystem
+Current completed phase: Phase 12.2 - Instrumentation & Root Cause Analysis Framework
 
 This repository now has:
 
 - a root [main.py](main.py) submission entrypoint,
 - a root [deck.csv](deck.csv) submission deck file,
 - an official-SDK local runner in [run_local.py](run_local.py),
-- a submission packager in [build_submission.py](build_submission.py).
+- a submission packager in [build_submission.py](build_submission.py),
+- upgraded tactical rule system with WinningAttackRule, KnockoutRule, and PrizeRule,
+- action validation that prevents returning illegal actions to the environment,
+- safe fallback behavior when action validation fails,
+- comprehensive instrumentation to trace every action decision,
+- analysis tools to identify illegal actions with evidence.
 
 ## Key Docs
 
@@ -47,6 +54,7 @@ This repository now has:
 - Debug logging reference: [docs/debug_logging.md](docs/debug_logging.md)
 - Baseline agent reference: [docs/baseline_agent.md](docs/baseline_agent.md)
 - Deck validation reference: [docs/deck_validation.md](docs/deck_validation.md)
+- Phase history: [docs/phases.md](docs/phases.md)
 
 # Running the Project
 
@@ -222,6 +230,48 @@ From the competition page:
 2. Upload it under the competition's "My Submissions" tab.
 
 The competition page states the bundle must be a `.tar.gz` archive with `main.py` at the top level and include `deck.csv`.
+
+## Analyzing Action Traces for Illegal Actions
+
+When games end with INVALID status, the instrumentation system captures detailed traces for diagnosis:
+
+```powershell
+python run_local.py --games 10 --replay
+python analyze_traces.py
+```
+
+This will:
+
+1. Run 10 local games with tracing enabled
+2. Export trace JSON files to `outputs/replays/trace_*.json`
+3. Analyze all traces to find any illegal actions
+4. Report with exact turn, player, and action details
+
+Expected output if no issues found:
+
+```
+✓ No illegal actions found in any trace files.
+```
+
+Expected output if illegal action detected:
+
+```
+ILLEGAL ACTIONS DETECTED:
+Decision 15 (Turn 4, Player 1):
+  Returned Integer: 5
+  Legal Range: [0, 2]
+```
+
+The trace data includes:
+- Turn and step number
+- Player index
+- Selection type and context
+- Legal action count and details
+- Chosen action
+- Returned integer
+- Validation pass/fail status
+
+For detailed instrumentation guide, see [INSTRUMENTATION_GUIDE.md](INSTRUMENTATION_GUIDE.md).
 
 ## Troubleshooting
 

@@ -115,6 +115,55 @@ class BaselineAgentTestCase(unittest.TestCase):
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
+    def test_validation_rejects_action_with_invalid_index(self) -> None:
+        """Test that actions with out-of-range indices fall back to first legal action."""
+        observation = ObservationParser(self.card_database).parse(self._build_attack_observation())
+        agent = create_baseline_agent(BaselineAgentConfig(replay=self._replay_config(enabled=False)))
+        artifacts = agent._build_decision_artifacts(observation)
+
+        # Create an action with invalid index
+        from poketcg.actions import EndTurnAction, ActionKind
+        from poketcg.domain import SelectContext, SelectType, OptionReference, OptionType
+
+        invalid_action = EndTurnAction(
+            action_index=999,  # Out of range
+            kind=ActionKind.END_TURN,
+            option=OptionReference(option_type=OptionType.END),
+            selection_context=SelectContext.MAIN,
+            selection_type=SelectType.MAIN,
+        )
+
+        validated = agent._validate_action_legality(invalid_action, artifacts)
+
+        # Should fall back to first legal action
+        self.assertEqual(validated.action_index, 0)
+        self.assertIn(validated, artifacts.context.legal_actions)
+
+    def test_validation_rejects_none_action(self) -> None:
+        """Test that None actions fall back to first legal action."""
+        observation = ObservationParser(self.card_database).parse(self._build_attack_observation())
+        agent = create_baseline_agent(BaselineAgentConfig(replay=self._replay_config(enabled=False)))
+        artifacts = agent._build_decision_artifacts(observation)
+
+        validated = agent._validate_action_legality(None, artifacts)
+
+        # Should fall back to first legal action
+        self.assertEqual(validated.action_index, 0)
+        self.assertIn(validated, artifacts.context.legal_actions)
+
+    def test_validation_accepts_legal_action(self) -> None:
+        """Test that legal actions are accepted without modification."""
+        observation = ObservationParser(self.card_database).parse(self._build_attack_observation())
+        agent = create_baseline_agent(BaselineAgentConfig(replay=self._replay_config(enabled=False)))
+        artifacts = agent._build_decision_artifacts(observation)
+
+        # Use first legal action
+        legal_action = artifacts.context.legal_actions[0]
+        validated = agent._validate_action_legality(legal_action, artifacts)
+
+        # Should be the same action
+        self.assertIs(validated, legal_action)
+
     def _replay_config(self, *, enabled: bool = True, output_directory: Path | None = None):
         from poketcg.debug.replay_logger import ReplayLoggerConfig
 

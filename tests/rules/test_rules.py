@@ -76,7 +76,7 @@ class RuleLibraryTestCase(unittest.TestCase):
 
         self.assertTrue(result.passed)
         self.assertIs(result.selected_action, action)
-        self.assertIn("energy", result.reason.lower())
+        self.assertIn("damage", result.reason.lower())
 
     def test_attack_rule_unavailable(self) -> None:
         analyzer, context, _ = self._build_attack_context(include_attack=False)
@@ -92,7 +92,7 @@ class RuleLibraryTestCase(unittest.TestCase):
 
         self.assertTrue(result.passed)
         self.assertIs(result.selected_action, action)
-        self.assertIn("unused", result.reason.lower())
+        self.assertIn("attack gap", result.reason.lower())
 
     def test_attach_energy_rule_unavailable(self) -> None:
         analyzer, context, _ = self._build_energy_context(include_energy=False)
@@ -100,7 +100,7 @@ class RuleLibraryTestCase(unittest.TestCase):
 
         self.assertFalse(result.passed)
         self.assertIsNone(result.selected_action)
-        self.assertEqual(result.reason, "No attachable energy.")
+        self.assertEqual(result.reason, "No attachable energy that improves an attack path.")
 
     def test_retreat_rule_available(self) -> None:
         analyzer, context, action = self._build_retreat_context()
@@ -307,7 +307,9 @@ class RuleLibraryTestCase(unittest.TestCase):
         active_card = self._pokemon_card(require_attack=True)
         active = self._pokemon(active_card)
         bench_card = self._pokemon_card()
+        # Give bench Pokemon more HP so it has better board value
         bench = self._pokemon(bench_card)
+        bench.current_hp = bench.max_hp + 20  # Make bench Pokemon healthier
         state = self._state(active, bench=bench)
         if include_retreat:
             action = self._make_retreat_action(bench)
